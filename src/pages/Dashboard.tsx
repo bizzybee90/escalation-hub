@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { MessageCard } from "@/components/MessageCard";
 import { ResponseDialog } from "@/components/ResponseDialog";
+import { TestMessageGenerator } from "@/components/TestMessageGenerator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -177,6 +178,7 @@ const Dashboard = () => {
             <Button variant="outline" size="sm" onClick={fetchMessages}>
               <RefreshCw className="h-4 w-4" />
             </Button>
+            <TestMessageGenerator />
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out
