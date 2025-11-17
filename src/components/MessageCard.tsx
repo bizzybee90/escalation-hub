@@ -84,22 +84,34 @@ export const MessageCard = ({ message, onRespond }: MessageCardProps) => {
         </div>
         
         {message.conversation_context && (
-          <details className="group">
-            <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
-              View conversation history
-            </summary>
-            <div className="mt-2 space-y-2 rounded-lg bg-muted/50 p-3">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Conversation History</p>
+            <div className="space-y-2 rounded-lg bg-muted/50 p-3 max-h-60 overflow-y-auto">
               {Array.isArray(message.conversation_context) ? (
                 message.conversation_context.map((msg: any, idx: number) => (
-                  <div key={idx} className="text-sm">
-                    <span className="font-medium">{msg.role || 'User'}:</span> {msg.content || msg.message}
+                  <div 
+                    key={idx} 
+                    className={`p-2 rounded text-sm ${
+                      msg.role === 'ai' 
+                        ? 'bg-primary/10 border-l-2 border-primary' 
+                        : 'bg-background border-l-2 border-muted-foreground'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-xs font-semibold ${
+                        msg.role === 'ai' ? 'text-primary' : 'text-foreground'
+                      }`}>
+                        {msg.role === 'ai' ? '🤖 Claude AI' : '👤 Customer'}
+                      </span>
+                    </div>
+                    <p className="text-foreground/90">{msg.content || msg.message}</p>
                   </div>
                 ))
               ) : (
                 <pre className="text-xs overflow-auto">{JSON.stringify(message.conversation_context, null, 2)}</pre>
               )}
             </div>
-          </details>
+          </div>
         )}
 
         <div className="flex items-center justify-between pt-2">
