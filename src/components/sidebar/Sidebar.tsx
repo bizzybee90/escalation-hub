@@ -36,19 +36,19 @@ export const Sidebar = () => {
   };
   return (
     <TooltipProvider>
-      <div className={`flex flex-col h-full p-4 transition-all duration-300 relative ${collapsed ? 'w-20' : 'w-60'}`}>
+      <div className={`flex flex-col h-full transition-all duration-300 relative ${collapsed ? 'w-20 p-2' : 'w-60 p-4'}`}>
         {/* Collapse Toggle */}
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setCollapsed(!collapsed)}
-          className={`absolute top-4 z-10 h-8 w-8 bg-background/95 backdrop-blur hover:bg-accent transition-all duration-300 ${collapsed ? 'left-2' : 'right-2'}`}
+          className={`absolute top-4 z-10 h-8 w-8 bg-background/95 backdrop-blur hover:bg-accent transition-all duration-300 ${collapsed ? 'left-1/2 -translate-x-1/2' : 'right-2'}`}
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </Button>
 
         {/* Logo Section */}
-        <div className={`mb-6 flex items-center ${collapsed ? 'justify-center mt-14' : 'gap-3 mt-0'}`}>
+        <div className={`flex items-center ${collapsed ? 'justify-center mt-16 mb-4' : 'gap-3 mb-6 mt-0'}`}>
           {collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -132,7 +132,7 @@ export const Sidebar = () => {
                 <NavLink
                   to="/"
                   end
-                  className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                  className={`flex items-center ${collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                   activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10">
@@ -153,7 +153,7 @@ export const Sidebar = () => {
               <TooltipTrigger asChild>
                 <NavLink
                   to="/unassigned"
-                  className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                  className={`flex items-center ${collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                   activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-destructive/10">
@@ -174,7 +174,7 @@ export const Sidebar = () => {
               <TooltipTrigger asChild>
                 <NavLink
                   to="/sla-risk"
-                  className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                  className={`flex items-center ${collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                   activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-500/10">
@@ -195,7 +195,7 @@ export const Sidebar = () => {
               <TooltipTrigger asChild>
                 <NavLink
                   to="/all-open"
-                  className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                  className={`flex items-center ${collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                   activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-500/10">
@@ -224,7 +224,7 @@ export const Sidebar = () => {
           <div className="space-y-1">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" className={`w-full ${collapsed ? 'justify-center px-2' : 'justify-start gap-3 px-3'} py-2.5 h-auto hover-scale`}>
+                <Button variant="ghost" className={`w-full ${collapsed ? 'justify-center p-2' : 'justify-start gap-3 px-3'} py-2.5 h-auto hover-scale`}>
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
                     <Zap className="h-4 w-4 text-blue-500" />
                   </div>
@@ -239,7 +239,7 @@ export const Sidebar = () => {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" className={`w-full ${collapsed ? 'justify-center px-2' : 'justify-start gap-3 px-3'} py-2.5 h-auto hover-scale`}>
+                <Button variant="ghost" className={`w-full ${collapsed ? 'justify-center p-2' : 'justify-start gap-3 px-3'} py-2.5 h-auto hover-scale`}>
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-500/10">
                     <Filter className="h-4 w-4 text-purple-500" />
                   </div>
