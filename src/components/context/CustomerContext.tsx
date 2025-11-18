@@ -4,9 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mail, Phone, MessageSquare, Crown } from 'lucide-react';
+import { Mail, Phone, MessageSquare, Crown, Clock, CheckCircle2, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
+import { SnoozeDialog } from '@/components/conversations/SnoozeDialog';
 
 interface CustomerContextProps {
   conversation: Conversation;
@@ -16,6 +18,7 @@ interface CustomerContextProps {
 export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps) => {
   const customer = conversation.customer;
   const { toast } = useToast();
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
 
   if (!customer) {
     return (
@@ -98,12 +101,42 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
 
       <div className="space-y-2">
         <h4 className="text-sm font-semibold text-muted-foreground uppercase">Quick Actions</h4>
-        <div className="space-y-2">
+        <div className="grid gap-2">
+          {conversation.status !== 'resolved' && (
+            <Button 
+              variant="default" 
+              className="w-full justify-start bg-success hover:bg-success/90"
+              onClick={async () => {
+                await supabase
+                  .from('conversations')
+                  .update({ 
+                    status: 'resolved',
+                    resolved_at: new Date().toISOString()
+                  })
+                  .eq('id', conversation.id);
+                toast({ title: "Conversation resolved" });
+                onUpdate();
+              }}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Resolve & Close
+            </Button>
+          )}
+
+          <Button 
+            variant="outline" 
+            className="w-full justify-start"
+            onClick={() => setSnoozeOpen(true)}
+          >
+            <Clock className="h-4 w-4 mr-2" />
+            Snooze
+          </Button>
+
           <Select
             value={conversation.priority}
             onValueChange={(value) => updatePriority(value)}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Change Priority" />
             </SelectTrigger>
             <SelectContent>
@@ -117,7 +150,7 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
             value={conversation.status}
             onValueChange={(value) => updateStatus(value)}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Change Status" />
             </SelectTrigger>
             <SelectContent>
@@ -128,11 +161,25 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
             </SelectContent>
           </Select>
 
-          <Button variant="outline" className="w-full" onClick={handleAssignToMe}>
-            Assign to Me
-          </Button>
+          {!conversation.assigned_to && (
+            <Button 
+              variant="outline" 
+              className="w-full justify-start" 
+              onClick={handleAssignToMe}
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Assign to Me
+            </Button>
+          )}
         </div>
       </div>
+
+      <SnoozeDialog
+        conversationId={conversation.id}
+        open={snoozeOpen}
+        onOpenChange={setSnoozeOpen}
+        onSuccess={onUpdate}
+      />
     </div>
   );
 

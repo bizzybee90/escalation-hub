@@ -2,6 +2,8 @@ import { Message } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Bot, User, StickyNote } from 'lucide-react';
+import { ChannelIcon } from '@/components/shared/ChannelIcon';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 interface MessageTimelineProps {
@@ -20,10 +22,11 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
         if (isInternal) {
           return (
             <div key={message.id} className="w-full">
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+              <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <StickyNote className="h-4 w-4 text-yellow-600" />
-                  <Badge variant="outline" className="text-xs">Internal Note</Badge>
+                  <StickyNote className="h-4 w-4 text-warning" />
+                  <Badge variant="outline" className="text-xs bg-warning/20 border-warning">Internal Note</Badge>
+                  <ChannelIcon channel={message.channel} className="h-3 w-3" />
                   <span className="text-xs text-muted-foreground">
                     {message.actor_name} • {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
                   </span>
@@ -45,13 +48,17 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
             {(isCustomer || isAI) && (
               <div className="flex-shrink-0">
                 {isAI ? (
-                  <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                    <Bot className="h-4 w-4 text-blue-600" />
-                  </div>
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-primary/10">
+                      <Bot className="h-4 w-4 text-primary" />
+                    </AvatarFallback>
+                  </Avatar>
                 ) : (
-                  <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                    <User className="h-4 w-4 text-gray-600" />
-                  </div>
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-muted">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                    </AvatarFallback>
+                  </Avatar>
                 )}
               </div>
             )}
@@ -59,16 +66,17 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
             <div
               className={cn(
                 'max-w-[70%] rounded-lg p-3',
-                isCustomer && 'bg-gray-100 dark:bg-gray-800',
-                isAI && 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800',
-                isHuman && 'bg-green-100 dark:bg-green-900/20'
+                isCustomer && 'bg-muted',
+                isAI && 'bg-primary/10 border border-primary/20',
+                isHuman && 'bg-success/10 border border-success/20'
               )}
             >
               <div className="flex items-center gap-2 mb-1">
+                <ChannelIcon channel={message.channel} />
                 <span className="text-xs font-medium">
                   {message.actor_name || (isCustomer ? 'Customer' : 'Agent')}
                 </span>
-                {isAI && <Badge variant="secondary" className="text-xs">AI</Badge>}
+                {isAI && <Badge variant="secondary" className="text-xs bg-primary/20">AI</Badge>}
                 <span className="text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
                 </span>
@@ -78,9 +86,11 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
 
             {isHuman && (
               <div className="flex-shrink-0">
-                <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                  <User className="h-4 w-4 text-green-600" />
-                </div>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-success/10">
+                    <User className="h-4 w-4 text-success" />
+                  </AvatarFallback>
+                </Avatar>
               </div>
             )}
           </div>

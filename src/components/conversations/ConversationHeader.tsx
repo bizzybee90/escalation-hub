@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { SLABadge } from '../sla/SLABadge';
-import { Crown, ArrowLeft } from 'lucide-react';
+import { SLACountdown } from '../sla/SLACountdown';
+import { Crown, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ConversationHeaderProps {
@@ -39,11 +40,24 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack }: Conversat
     });
     
     onUpdate();
+  };
+
+  const handleResolve = async () => {
+    await supabase
+      .from('conversations')
+      .update({ 
+        status: 'resolved',
+        resolved_at: new Date().toISOString()
+      })
+      .eq('id', conversation.id);
     
-    // Navigate back to list so user can see it in "my tickets"
-    if (onBack) {
-      onBack();
-    }
+    toast({
+      title: "Conversation resolved",
+      description: "This conversation has been marked as resolved.",
+    });
+    
+    onUpdate();
+    onBack?.();
   };
 
   return (
@@ -64,17 +78,20 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack }: Conversat
             {conversation.customer?.name || 'Unknown Customer'}
           </h2>
           {conversation.customer?.tier === 'vip' && (
-            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30">
+            <Badge variant="secondary" className="bg-warning/20 text-warning-foreground">
               <Crown className="h-3 w-3 mr-1" />
               VIP
             </Badge>
           )}
         </div>
-        <SLABadge
-          slaStatus={conversation.sla_status}
-          slaDueAt={conversation.sla_due_at}
-          size="default"
-        />
+        <div className="flex items-center gap-2">
+          <SLACountdown slaDueAt={conversation.sla_due_at} />
+          <SLABadge
+            slaStatus={conversation.sla_status}
+            slaDueAt={conversation.sla_due_at}
+            size="default"
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
@@ -109,9 +126,18 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack }: Conversat
           </SelectContent>
         </Select>
 
-        <Button variant="outline" size="sm" onClick={handleAssignToMe}>
-          Assign to Me
-        </Button>
+        {!conversation.assigned_to && (
+          <Button variant="outline" size="sm" onClick={handleAssignToMe}>
+            Assign to Me
+          </Button>
+        )}
+
+        {conversation.status !== 'resolved' && (
+          <Button variant="default" size="sm" onClick={handleResolve} className="bg-success hover:bg-success/90">
+            <CheckCircle2 className="h-4 w-4 mr-1" />
+            Resolve & Close
+          </Button>
+        )}
       </div>
     </div>
   );

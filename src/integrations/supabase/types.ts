@@ -33,6 +33,7 @@ export type Database = {
           sla_due_at: string | null
           sla_status: string | null
           sla_target_minutes: number | null
+          snoozed_until: string | null
           status: string | null
           summary_for_human: string | null
           title: string | null
@@ -57,6 +58,7 @@ export type Database = {
           sla_due_at?: string | null
           sla_status?: string | null
           sla_target_minutes?: number | null
+          snoozed_until?: string | null
           status?: string | null
           summary_for_human?: string | null
           title?: string | null
@@ -81,6 +83,7 @@ export type Database = {
           sla_due_at?: string | null
           sla_status?: string | null
           sla_target_minutes?: number | null
+          snoozed_until?: string | null
           status?: string | null
           summary_for_human?: string | null
           title?: string | null
@@ -397,6 +400,7 @@ export type Database = {
           created_at: string | null
           email: string
           id: string
+          interface_mode: string | null
           is_online: boolean | null
           last_active_at: string | null
           name: string
@@ -408,6 +412,7 @@ export type Database = {
           created_at?: string | null
           email: string
           id: string
+          interface_mode?: string | null
           is_online?: boolean | null
           last_active_at?: string | null
           name: string
@@ -419,6 +424,7 @@ export type Database = {
           created_at?: string | null
           email?: string
           id?: string
+          interface_mode?: string | null
           is_online?: boolean | null
           last_active_at?: string | null
           name?: string

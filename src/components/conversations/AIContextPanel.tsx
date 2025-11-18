@@ -1,10 +1,12 @@
 import { Conversation } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Lightbulb, AlertTriangle, BarChart3, FolderOpen } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Lightbulb, AlertTriangle, BarChart3, FolderOpen, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 interface AIContextPanelProps {
   conversation: Conversation;
@@ -12,6 +14,11 @@ interface AIContextPanelProps {
 
 export const AIContextPanel = ({ conversation }: AIContextPanelProps) => {
   const [isOpen, setIsOpen] = useState(true);
+  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
+
+  const escalatedAt = conversation.created_at 
+    ? formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })
+    : null;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -25,7 +32,46 @@ export const AIContextPanel = ({ conversation }: AIContextPanelProps) => {
         </CollapsibleTrigger>
         
         <CollapsibleContent>
-          <div className="p-4 pt-0 space-y-3">
+          <div className="p-4 pt-0 space-y-4">
+            {/* Escalation Reason - MOST IMPORTANT */}
+            {conversation.ai_reason_for_escalation && (
+              <div className="bg-urgent/10 border border-urgent/30 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-4 w-4 text-urgent" />
+                  <span className="text-sm font-semibold text-urgent">Why AI Escalated</span>
+                  {escalatedAt && (
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {escalatedAt}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-foreground">
+                  {conversation.ai_reason_for_escalation}
+                </p>
+                
+                {/* Feedback buttons */}
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+                  <span className="text-xs text-muted-foreground">Was this escalation helpful?</span>
+                  <Button
+                    variant={feedback === 'up' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => setFeedback('up')}
+                  >
+                    <ThumbsUp className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant={feedback === 'down' ? 'destructive' : 'ghost'}
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => setFeedback('down')}
+                  >
+                    <ThumbsDown className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {conversation.summary_for_human && (
               <div>
                 <div className="flex items-center gap-2 mb-1">
@@ -38,19 +84,7 @@ export const AIContextPanel = ({ conversation }: AIContextPanelProps) => {
               </div>
             )}
 
-            {conversation.ai_reason_for_escalation && (
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Why Escalated</span>
-                </div>
-                <p className="text-sm text-foreground/80 pl-6">
-                  {conversation.ai_reason_for_escalation}
-                </p>
-              </div>
-            )}
-
-            <div className="flex items-center gap-4 pl-6">
+            <div className="flex items-center gap-4 pl-6 flex-wrap">
               {conversation.ai_confidence !== null && (
                 <div className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4 text-muted-foreground" />
