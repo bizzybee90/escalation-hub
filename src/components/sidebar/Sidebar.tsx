@@ -1,10 +1,13 @@
-import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter } from 'lucide-react';
+import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter, Zap, Columns } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { TeamStatus } from './TeamStatus';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { useInterfaceMode } from '@/hooks/useInterfaceMode';
+import { Card } from '@/components/ui/card';
 
 export const Sidebar = () => {
+  const { interfaceMode, toggleMode, loading } = useInterfaceMode();
   return (
     <div className="flex flex-col h-full p-4">
       <div className="mb-6">
@@ -80,6 +83,35 @@ export const Sidebar = () => {
       <div className="flex-1 overflow-auto">
         <TeamStatus />
       </div>
+
+      <Separator className="my-4" />
+
+      {/* Interface Mode Toggle */}
+      {!loading && (
+        <Card className="p-3 bg-muted/50">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase">Interface</span>
+          </div>
+          <Button
+            variant={interfaceMode === 'focus' ? 'default' : 'outline'}
+            size="sm"
+            className="w-full justify-start mb-1"
+            onClick={() => interfaceMode === 'power' && toggleMode()}
+          >
+            <Zap className="h-3 w-3 mr-2" />
+            <span className="text-xs">Focus Mode</span>
+          </Button>
+          <Button
+            variant={interfaceMode === 'power' ? 'default' : 'outline'}
+            size="sm"
+            className="w-full justify-start"
+            onClick={() => interfaceMode === 'focus' && toggleMode()}
+          >
+            <Columns className="h-3 w-3 mr-2" />
+            <span className="text-xs">Power Mode</span>
+          </Button>
+        </Card>
+      )}
     </div>
   );
 };

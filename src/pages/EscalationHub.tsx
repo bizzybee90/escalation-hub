@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
+import { PowerModeLayout } from '@/components/layout/PowerModeLayout';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { ConversationList } from '@/components/conversations/ConversationList';
 import { ConversationThread } from '@/components/conversations/ConversationThread';
 import { CustomerContext } from '@/components/context/CustomerContext';
 import { Conversation } from '@/lib/types';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { useInterfaceMode } from '@/hooks/useInterfaceMode';
+import { useSLANotifications } from '@/hooks/useSLANotifications';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface EscalationHubProps {
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open';
@@ -14,6 +20,12 @@ interface EscalationHubProps {
 export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [modalWidth, setModalWidth] = useState(90);
+  const { interfaceMode, loading: modeLoading } = useInterfaceMode();
+  
+  // Enable SLA notifications
+  useSLANotifications();
 
   const handleUpdate = () => {
     setRefreshKey(prev => prev + 1);
@@ -23,6 +35,37 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
     setSelectedConversation(null);
   };
 
+  const navigateConversation = (direction: 'prev' | 'next') => {
+    if (!selectedConversation || conversations.length === 0) return;
+    
+    const currentIndex = conversations.findIndex(c => c.id === selectedConversation.id);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex >= 0 && newIndex < conversations.length) {
+      setSelectedConversation(conversations[newIndex]);
+      setRefreshKey(prev => prev + 1);
+    }
+  };
+
+  const getCurrentPosition = () => {
+    if (!selectedConversation || conversations.length === 0) return { current: 0, total: 0 };
+    const current = conversations.findIndex(c => c.id === selectedConversation.id) + 1;
+    return { current, total: conversations.length };
+  };
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: 'Escape', callback: handleClose },
+    { key: 'ArrowLeft', callback: () => navigateConversation('prev') },
+    { key: 'ArrowRight', callback: () => navigateConversation('next') },
+  ], !!selectedConversation);
+
+  // If Power Mode is selected, render the 3-column layout
+  if (!modeLoading && interfaceMode === 'power') {
+    return <PowerModeLayout filter={filter} />;
+  }
+
   return (
     <>
       <ThreeColumnLayout
@@ -31,13 +74,70 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
           <ConversationList
             filter={filter}
             selectedId={selectedConversation?.id}
-            onSelect={setSelectedConversation}
+            onSelect={(conv) => {
+              setSelectedConversation(conv);
+              setRefreshKey(prev => prev + 1);
+            }}
+            onConversationsChange={setConversations}
           />
         }
       />
       
       <Dialog open={!!selectedConversation} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-[90vw] h-[90vh] p-0 overflow-hidden flex gap-0">
+        <DialogContent 
+          className="p-0 overflow-hidden flex gap-0 transition-all duration-300"
+          style={{ maxWidth: `${modalWidth}vw`, width: '100%', height: '90vh' }}
+        >
+          {/* Resize handle - left edge */}
+          <div 
+            className="w-1 bg-border hover:bg-primary cursor-ew-resize flex-shrink-0"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const startX = e.clientX;
+              const startWidth = modalWidth;
+
+              const handleMouseMove = (e: MouseEvent) => {
+                const deltaX = startX - e.clientX;
+                const newWidth = Math.min(95, Math.max(60, startWidth + (deltaX / window.innerWidth) * 100));
+                setModalWidth(newWidth);
+              };
+
+              const handleMouseUp = () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+              };
+
+              document.addEventListener('mousemove', handleMouseMove);
+              document.addEventListener('mouseup', handleMouseUp);
+            }}
+          />
+
+          {/* Navigation controls */}
+          {conversations.length > 1 && (
+            <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-background/95 backdrop-blur rounded-lg p-1 border border-border">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => navigateConversation('prev')}
+                disabled={getCurrentPosition().current <= 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs text-muted-foreground px-2">
+                {getCurrentPosition().current} of {getCurrentPosition().total}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => navigateConversation('next')}
+                disabled={getCurrentPosition().current >= getCurrentPosition().total}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           <div className="flex-1 flex flex-col overflow-hidden">
             {selectedConversation && (
               <ConversationThread

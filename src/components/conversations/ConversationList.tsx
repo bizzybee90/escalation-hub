@@ -9,9 +9,10 @@ interface ConversationListProps {
   selectedId?: string;
   onSelect: (conversation: Conversation) => void;
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open';
+  onConversationsChange?: (conversations: Conversation[]) => void;
 }
 
-export const ConversationList = ({ selectedId, onSelect, filter = 'all-open' }: ConversationListProps) => {
+export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', onConversationsChange }: ConversationListProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -60,7 +61,14 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open' }: 
 
       const { data } = await query;
       if (data) {
-        setConversations(data as any);
+        const conversationData = data as any;
+        // Filter out snoozed conversations
+        const activeConversations = conversationData.filter((conv: any) => {
+          if (!conv.snoozed_until) return true;
+          return new Date(conv.snoozed_until) <= new Date();
+        });
+        setConversations(activeConversations);
+        onConversationsChange?.(activeConversations);
       }
       setLoading(false);
     };
