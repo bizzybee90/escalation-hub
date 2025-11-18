@@ -2,23 +2,55 @@ import { Conversation } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Lightbulb, AlertTriangle, BarChart3, FolderOpen, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Lightbulb, AlertTriangle, BarChart3, FolderOpen, ThumbsUp, ThumbsDown, Send } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface AIContextPanelProps {
   conversation: Conversation;
+  onUpdate?: () => void;
 }
 
-export const AIContextPanel = ({ conversation }: AIContextPanelProps) => {
+export const AIContextPanel = ({ conversation, onUpdate }: AIContextPanelProps) => {
   const [isOpen, setIsOpen] = useState(true);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
   const escalatedAt = conversation.created_at 
     ? formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })
     : null;
+
+  const handleSendDraft = async () => {
+    if (!conversation.metadata?.ai_draft_response) return;
+    
+    setIsSending(true);
+    try {
+      // Create the outbound message
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversation.id,
+          body: conversation.metadata.ai_draft_response,
+          channel: conversation.channel,
+          direction: 'outbound',
+          actor_type: 'agent',
+        });
+
+      if (error) throw error;
+
+      toast.success('AI draft sent successfully');
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error sending AI draft:', error);
+      toast.error('Failed to send AI draft');
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -90,14 +122,25 @@ export const AIContextPanel = ({ conversation }: AIContextPanelProps) => {
                 <div className="flex items-start gap-2">
                   <Lightbulb className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                   <div className="flex-1 space-y-2">
-                    <h3 className="font-semibold text-sm">AI Draft Response</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-sm">AI Draft Response</h3>
+                      <Button
+                        size="sm"
+                        onClick={handleSendDraft}
+                        disabled={isSending}
+                        className="h-7"
+                      >
+                        <Send className="h-3 w-3 mr-1" />
+                        {isSending ? 'Sending...' : 'Send Draft'}
+                      </Button>
+                    </div>
                     <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">
                         {conversation.metadata.ai_draft_response}
                       </p>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      This draft will be available in the reply area below
+                      This draft is also available in the reply area below
                     </p>
                   </div>
                 </div>
