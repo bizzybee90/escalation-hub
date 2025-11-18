@@ -39,6 +39,11 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack }: Conversat
     });
     
     onUpdate();
+    
+    // Navigate back to list so user can see it in "my tickets"
+    if (onBack) {
+      onBack();
+    }
   };
 
   return (
