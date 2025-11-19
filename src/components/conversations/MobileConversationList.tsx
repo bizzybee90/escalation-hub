@@ -147,9 +147,9 @@ export const MobileConversationList = ({
               <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           }
-          className="h-full overflow-y-auto"
         >
-          <div className="p-5 space-y-3">
+          <div className="h-full overflow-y-auto">
+            <div className="p-5 space-y-3">
             {conversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
                 <p className="text-[17px] font-semibold text-foreground mb-2">No conversations</p>
@@ -214,6 +214,7 @@ export const MobileConversationList = ({
                 </button>
               ))
             )}
+            </div>
           </div>
         </PullToRefresh>
       </div>
