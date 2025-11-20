@@ -11,14 +11,14 @@ interface MobileConversationListProps {
   conversations: Conversation[];
   onSelect: (conversation: Conversation) => void;
   filterTitle: string;
-  statusFilter: string;
-  priorityFilter: string;
-  channelFilter: string;
-  categoryFilter: string;
-  onStatusFilterChange: (value: string) => void;
-  onPriorityFilterChange: (value: string) => void;
-  onChannelFilterChange: (value: string) => void;
-  onCategoryFilterChange: (value: string) => void;
+  statusFilter: string[];
+  priorityFilter: string[];
+  channelFilter: string[];
+  categoryFilter: string[];
+  onStatusFilterChange: (value: string[]) => void;
+  onPriorityFilterChange: (value: string[]) => void;
+  onChannelFilterChange: (value: string[]) => void;
+  onCategoryFilterChange: (value: string[]) => void;
   onRefresh: () => Promise<void>;
 }
 
@@ -97,12 +97,7 @@ export const MobileConversationList = ({
   ];
 
   const getActiveFilterCount = () => {
-    let count = 0;
-    if (statusFilter !== 'all') count++;
-    if (priorityFilter !== 'all') count++;
-    if (channelFilter !== 'all') count++;
-    if (categoryFilter !== 'all') count++;
-    return count;
+    return statusFilter.length + priorityFilter.length + channelFilter.length + categoryFilter.length;
   };
 
   const activeFilterCount = getActiveFilterCount();
