@@ -30,11 +30,11 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* Conversation List Panel (hidden on mobile when conversation selected) */}
         <ResizablePanel 
-          defaultSize={22} 
-          minSize={20}
-          maxSize={32}
+          defaultSize={18} 
+          minSize={15}
+          maxSize={25}
           collapsible={false}
-          className={selectedConversation ? "hidden md:flex min-w-[420px]" : "flex min-w-[420px]"}
+          className={selectedConversation ? "hidden md:flex min-w-[300px]" : "flex min-w-[300px]"}
         >
           <div className="h-full flex flex-col border-r border-border/30 bg-card w-full">
             <ConversationList
