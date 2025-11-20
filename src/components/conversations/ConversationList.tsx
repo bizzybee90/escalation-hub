@@ -105,8 +105,8 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-border">
+    <div className="flex flex-col h-full bg-muted/30">
+      <div className="p-5 border-b border-border/50 bg-background">
         <ConversationFilters
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
@@ -118,24 +118,21 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
           setCategoryFilter={setCategoryFilter}
         />
       </div>
-      
-      <div className="flex-1 overflow-y-auto">
+
+      <div className="flex-1 overflow-y-auto p-4">
         {conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 px-4">
-            <p className="text-muted-foreground text-sm">No conversations match your filters</p>
-            <p className="text-muted-foreground/60 text-xs mt-1">Try adjusting your search or filters</p>
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            No conversations found
           </div>
         ) : (
-          <div className="space-y-1 p-2 md:p-0">
-            {conversations.map((conversation) => (
-              <ConversationCard
-                key={conversation.id}
-                conversation={conversation}
-                selected={conversation.id === selectedId}
-                onClick={() => onSelect(conversation)}
-              />
-            ))}
-          </div>
+          conversations.map((conversation) => (
+            <ConversationCard
+              key={conversation.id}
+              conversation={conversation}
+              selected={selectedId === conversation.id}
+              onClick={() => onSelect(conversation)}
+            />
+          ))
         )}
       </div>
     </div>
