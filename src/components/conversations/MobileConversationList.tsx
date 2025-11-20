@@ -147,28 +147,6 @@ export const MobileConversationList = ({
         </div>
       </div>
 
-      {/* Filter Button */}
-      <div className="px-5 py-3 bg-background/50 backdrop-blur-sm border-b border-border/5">
-        <button
-          onClick={() => setIsFilterSheetOpen(true)}
-          className={cn(
-            "w-full h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
-            "flex items-center justify-center gap-2 border",
-            "active:scale-95",
-            activeFilterCount > 0
-              ? "bg-primary text-primary-foreground border-primary shadow-sm"
-              : "bg-muted text-muted-foreground border-border/50"
-          )}
-        >
-          <SlidersHorizontal className="h-5 w-5" />
-          Filters
-          {activeFilterCount > 0 && (
-            <span className="ml-1 px-2 py-0.5 rounded-full bg-primary-foreground/20 text-[13px] font-semibold">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-      </div>
 
       {/* Conversation List */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
@@ -268,6 +246,29 @@ export const MobileConversationList = ({
             )}
           </div>
         </PullToRefresh>
+      </div>
+
+      {/* Sticky Filter Button at Bottom */}
+      <div className="sticky bottom-0 left-0 right-0 p-5 pb-safe bg-gradient-to-t from-background via-background to-transparent">
+        <button
+          onClick={() => setIsFilterSheetOpen(true)}
+          className={cn(
+            "w-full h-[56px] rounded-2xl text-[16px] font-semibold transition-all duration-200",
+            "flex items-center justify-center gap-2 border shadow-lg",
+            "active:scale-95",
+            activeFilterCount > 0
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-background text-foreground border-border"
+          )}
+        >
+          <SlidersHorizontal className="h-5 w-5" />
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="ml-2 px-2.5 py-1 rounded-full bg-primary-foreground/20 text-[14px] font-bold">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
       </div>
     </div>
     </>
