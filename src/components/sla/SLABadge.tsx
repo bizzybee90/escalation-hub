@@ -34,7 +34,10 @@ export const SLABadge = ({ conversation, compact = false }: SLABadgeProps) => {
   return (
     <Badge 
       variant={isOverdue ? "destructive" : "secondary"}
-      className="text-xs font-medium"
+      className={cn(
+        "text-xs font-medium",
+        isOverdue && "text-destructive-foreground"
+      )}
     >
       {isOverdue ? 'Overdue' : <SLACountdown slaDueAt={conversation.sla_due_at} />}
     </Badge>
