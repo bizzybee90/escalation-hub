@@ -18,6 +18,7 @@ interface ConversationThreadProps {
 export const ConversationThread = ({ conversation, onUpdate, onBack }: ConversationThreadProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [draftText, setDraftText] = useState<string>('');
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -126,7 +127,11 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
       <ConversationHeader conversation={conversation} onUpdate={onUpdate} onBack={onBack} />
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        <AIContextPanel conversation={conversation} onUpdate={onUpdate} />
+        <AIContextPanel 
+          conversation={conversation} 
+          onUpdate={onUpdate}
+          onUseDraft={setDraftText}
+        />
         <MessageTimeline messages={messages} />
       </div>
 
@@ -135,6 +140,8 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
         channel={conversation.channel}
         aiDraftResponse={conversation.metadata?.ai_draft_response as string}
         onSend={handleReply}
+        externalDraftText={draftText}
+        onDraftTextCleared={() => setDraftText('')}
       />
     </div>
   );

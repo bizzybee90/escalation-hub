@@ -14,9 +14,11 @@ interface ReplyAreaProps {
   channel: string;
   aiDraftResponse?: string;
   onSend: (body: string, isInternal: boolean) => Promise<void>;
+  externalDraftText?: string;
+  onDraftTextCleared?: () => void;
 }
 
-export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: ReplyAreaProps) => {
+export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, externalDraftText, onDraftTextCleared }: ReplyAreaProps) => {
   const [replyBody, setReplyBody] = useState('');
   const [noteBody, setNoteBody] = useState('');
   const [selectedChannel, setSelectedChannel] = useState(channel);
@@ -25,6 +27,14 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
   const { toast } = useToast();
   const isTablet = useIsTablet();
   const isMobile = useIsMobile();
+
+  // Handle external draft text from AIContextPanel
+  useEffect(() => {
+    if (externalDraftText) {
+      setReplyBody(externalDraftText);
+      onDraftTextCleared?.();
+    }
+  }, [externalDraftText, onDraftTextCleared]);
 
   // Keyboard shortcuts for sending
   useEffect(() => {

@@ -9,44 +9,19 @@ import { toast } from 'sonner';
 interface AIContextPanelProps {
   conversation: Conversation;
   onUpdate?: () => void;
+  onUseDraft?: (draft: string) => void;
 }
 
-export const AIContextPanel = ({ conversation, onUpdate }: AIContextPanelProps) => {
+export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContextPanelProps) => {
   const [draftUsed, setDraftUsed] = useState(false);
 
   const aiDraftResponse = conversation.metadata?.ai_draft_response as string | undefined;
 
-  const handleUseDraft = async () => {
+  const handleUseDraft = () => {
     if (!aiDraftResponse) return;
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: userData } = await supabase
-        .from('users')
-        .select('name')
-        .eq('id', user.id)
-        .single();
-
-      await supabase.from('messages').insert({
-        conversation_id: conversation.id,
-        actor_type: 'human_agent',
-        actor_id: user.id,
-        actor_name: userData?.name || 'Agent',
-        direction: 'outbound',
-        channel: conversation.channel,
-        body: aiDraftResponse,
-        is_internal: false
-      });
-
-      setDraftUsed(true);
-      toast.success('AI draft used successfully');
-      onUpdate?.();
-    } catch (error) {
-      console.error('Error using AI draft:', error);
-      toast.error('Failed to use AI draft');
-    }
+    onUseDraft?.(aiDraftResponse);
+    setDraftUsed(true);
+    toast.success('Draft loaded into reply box');
   };
 
   const getSentimentEmoji = (sentiment: string | null) => {
