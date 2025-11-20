@@ -12,6 +12,7 @@ import { MessageTimeline } from '@/components/conversations/MessageTimeline';
 import { formatDistanceToNow } from 'date-fns';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { SnoozeDialog } from '@/components/conversations/SnoozeDialog';
 
 interface MobileConversationViewProps {
   conversation: Conversation;
@@ -43,6 +44,7 @@ export const MobileConversationView = ({
   const [aiDraftOpen, setAiDraftOpen] = useState(false);
   const [suggestedStrategyOpen, setSuggestedStrategyOpen] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const [snoozeDialogOpen, setSnoozeDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const handleResolve = async () => {
@@ -111,18 +113,6 @@ export const MobileConversationView = ({
               {isOverdue ? 'Overdue' : conversation.created_at && formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })}
             </p>
           </div>
-          
-          {/* Compact Customer Info */}
-          {conversation.customer_id && (
-            <button className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted active:scale-95 transition-all">
-              <Avatar className="h-6 w-6">
-                <AvatarFallback className="bg-primary/10 text-primary font-semibold text-[10px]">
-                  CU
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-[11px] font-semibold text-foreground">VIP</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -305,6 +295,18 @@ export const MobileConversationView = ({
             
             {/* Actions */}
             <Button
+              onClick={() => {
+                setSnoozeDialogOpen(true);
+                setShowActions(false);
+              }}
+              variant="outline"
+              className="w-full h-12 rounded-full text-[15px] font-semibold"
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              Snooze
+            </Button>
+            
+            <Button
               onClick={handleResolve}
               className="w-full h-12 rounded-full text-[15px] font-semibold shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
             >
@@ -382,6 +384,14 @@ export const MobileConversationView = ({
           </div>
         </div>
       </div>
+
+      {/* Snooze Dialog */}
+      <SnoozeDialog
+        conversationId={conversation.id}
+        open={snoozeDialogOpen}
+        onOpenChange={setSnoozeDialogOpen}
+        onSuccess={onUpdate}
+      />
     </div>
   );
 };
