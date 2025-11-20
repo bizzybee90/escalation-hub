@@ -30,10 +30,10 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [modalWidth, setModalWidth] = useState(75);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [priorityFilter, setPriorityFilter] = useState<string>('all');
-  const [channelFilter, setChannelFilter] = useState<string>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
+  const [channelFilter, setChannelFilter] = useState<string[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const { interfaceMode, loading: modeLoading } = useInterfaceMode();
   const { toast } = useToast();
   const isMobile = useIsMobile();

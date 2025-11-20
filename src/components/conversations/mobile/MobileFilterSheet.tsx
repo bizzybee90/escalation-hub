@@ -6,14 +6,14 @@ import { cn } from "@/lib/utils";
 interface MobileFilterSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  statusFilter: string;
-  priorityFilter: string;
-  channelFilter: string;
-  categoryFilter: string;
-  onStatusFilterChange: (value: string) => void;
-  onPriorityFilterChange: (value: string) => void;
-  onChannelFilterChange: (value: string) => void;
-  onCategoryFilterChange: (value: string) => void;
+  statusFilter: string[];
+  priorityFilter: string[];
+  channelFilter: string[];
+  categoryFilter: string[];
+  onStatusFilterChange: (value: string[]) => void;
+  onPriorityFilterChange: (value: string[]) => void;
+  onChannelFilterChange: (value: string[]) => void;
+  onCategoryFilterChange: (value: string[]) => void;
 }
 
 export const MobileFilterSheet = ({
@@ -29,14 +29,12 @@ export const MobileFilterSheet = ({
   onCategoryFilterChange,
 }: MobileFilterSheetProps) => {
   const statusOptions = [
-    { label: 'All', value: 'all' },
     { label: 'New', value: 'new' },
     { label: 'Open', value: 'open' },
     { label: 'Pending', value: 'pending' },
   ];
 
   const priorityOptions = [
-    { label: 'All', value: 'all' },
     { label: 'Urgent', value: 'urgent' },
     { label: 'High', value: 'high' },
     { label: 'Medium', value: 'medium' },
@@ -44,7 +42,6 @@ export const MobileFilterSheet = ({
   ];
 
   const channelOptions = [
-    { label: 'All', value: 'all' },
     { label: 'SMS', value: 'sms' },
     { label: 'Email', value: 'email' },
     { label: 'WhatsApp', value: 'whatsapp' },
@@ -52,23 +49,30 @@ export const MobileFilterSheet = ({
   ];
 
   const categoryOptions = [
-    { label: 'All', value: 'all' },
     { label: 'Billing', value: 'billing' },
     { label: 'Technical', value: 'technical' },
     { label: 'General', value: 'general' },
   ];
 
   const hasActiveFilters = 
-    statusFilter !== 'all' || 
-    priorityFilter !== 'all' || 
-    channelFilter !== 'all' || 
-    categoryFilter !== 'all';
+    statusFilter.length > 0 || 
+    priorityFilter.length > 0 || 
+    channelFilter.length > 0 || 
+    categoryFilter.length > 0;
 
   const handleClearAll = () => {
-    onStatusFilterChange('all');
-    onPriorityFilterChange('all');
-    onChannelFilterChange('all');
-    onCategoryFilterChange('all');
+    onStatusFilterChange([]);
+    onPriorityFilterChange([]);
+    onChannelFilterChange([]);
+    onCategoryFilterChange([]);
+  };
+
+  const toggleFilter = (currentValues: string[], value: string, onChange: (values: string[]) => void) => {
+    if (currentValues.includes(value)) {
+      onChange(currentValues.filter(v => v !== value));
+    } else {
+      onChange([...currentValues, value]);
+    }
   };
 
   return (
@@ -112,11 +116,11 @@ export const MobileFilterSheet = ({
                 {statusOptions.map((option) => (
                   <button
                     key={option.value}
-                    onClick={() => onStatusFilterChange(option.value)}
+                    onClick={() => toggleFilter(statusFilter, option.value, onStatusFilterChange)}
                     className={cn(
                       "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
                       "active:scale-95 border",
-                      statusFilter === option.value
+                      statusFilter.includes(option.value)
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-muted text-muted-foreground border-border/50"
                     )}
@@ -136,11 +140,11 @@ export const MobileFilterSheet = ({
                 {priorityOptions.map((option) => (
                   <button
                     key={option.value}
-                    onClick={() => onPriorityFilterChange(option.value)}
+                    onClick={() => toggleFilter(priorityFilter, option.value, onPriorityFilterChange)}
                     className={cn(
                       "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
                       "active:scale-95 border",
-                      priorityFilter === option.value
+                      priorityFilter.includes(option.value)
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-muted text-muted-foreground border-border/50"
                     )}
@@ -160,11 +164,11 @@ export const MobileFilterSheet = ({
                 {channelOptions.map((option) => (
                   <button
                     key={option.value}
-                    onClick={() => onChannelFilterChange(option.value)}
+                    onClick={() => toggleFilter(channelFilter, option.value, onChannelFilterChange)}
                     className={cn(
                       "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
                       "active:scale-95 border",
-                      channelFilter === option.value
+                      channelFilter.includes(option.value)
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-muted text-muted-foreground border-border/50"
                     )}
@@ -184,11 +188,11 @@ export const MobileFilterSheet = ({
                 {categoryOptions.map((option) => (
                   <button
                     key={option.value}
-                    onClick={() => onCategoryFilterChange(option.value)}
+                    onClick={() => toggleFilter(categoryFilter, option.value, onCategoryFilterChange)}
                     className={cn(
                       "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
                       "active:scale-95 border",
-                      categoryFilter === option.value
+                      categoryFilter.includes(option.value)
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-muted text-muted-foreground border-border/50"
                     )}

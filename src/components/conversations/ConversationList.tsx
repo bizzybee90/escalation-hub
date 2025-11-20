@@ -15,10 +15,10 @@ interface ConversationListProps {
 export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', onConversationsChange }: ConversationListProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [priorityFilter, setPriorityFilter] = useState<string>('all');
-  const [channelFilter, setChannelFilter] = useState<string>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
+  const [channelFilter, setChannelFilter] = useState<string[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -46,17 +46,17 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       }
 
       // Apply additional filters
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
+      if (statusFilter.length > 0) {
+        query = query.in('status', statusFilter);
       }
-      if (priorityFilter !== 'all') {
-        query = query.eq('priority', priorityFilter);
+      if (priorityFilter.length > 0) {
+        query = query.in('priority', priorityFilter);
       }
-      if (channelFilter !== 'all') {
-        query = query.eq('channel', channelFilter);
+      if (channelFilter.length > 0) {
+        query = query.in('channel', channelFilter);
       }
-      if (categoryFilter !== 'all') {
-        query = query.eq('category', categoryFilter);
+      if (categoryFilter.length > 0) {
+        query = query.in('category', categoryFilter);
       }
 
       const { data } = await query;
