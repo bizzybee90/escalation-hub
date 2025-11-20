@@ -82,8 +82,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
         {/* Two-Column Layout */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Left Column: Ticket List (40%) */}
-          <div className="w-[40%] border-r border-border bg-background overflow-y-auto">
+          {/* Left Column: Ticket List (35%) */}
+          <div className="w-[35%] border-r border-border bg-background overflow-y-auto">
             <div className="p-3">
               <ConversationList
                 selectedId={selectedConversation?.id}
@@ -94,37 +94,73 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
             </div>
           </div>
 
-          {/* Right Column: Conversation Panel (65-70%) */}
+          {/* Right Column: Conversation Panel (65%) */}
           <div className="flex-1 bg-background flex flex-col overflow-hidden">
             {selectedConversation ? (
               <>
-                {/* Conversation Header with Action Buttons */}
-                <div className="border-b border-border bg-card/30 backdrop-blur-sm px-6 py-3 flex items-center justify-between flex-shrink-0">
-                  <h1 className="text-lg font-semibold truncate">{selectedConversation.title}</h1>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => openDrawer('customer')}
-                      className="rounded-full bg-background/60 backdrop-blur-sm hover:bg-background/80"
-                    >
-                      <User className="h-4 w-4 mr-2" />
-                      Customer Info
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => openDrawer('actions')}
-                      className="rounded-full bg-background/60 backdrop-blur-sm hover:bg-background/80"
-                    >
-                      <Zap className="h-4 w-4 mr-2" />
-                      Quick Actions
-                    </Button>
+                {/* Premium Header Block */}
+                <div className="bg-card shadow-sm border-b border-border/30 flex-shrink-0">
+                  {/* Title + Badges Row */}
+                  <div className="px-6 py-4 flex items-center justify-between">
+                    <h1 className="text-xl font-semibold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">{selectedConversation.title}</h1>
+                    <div className="flex items-center gap-2">
+                      {selectedConversation.sla_due_at && (
+                        <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          new Date() > new Date(selectedConversation.sla_due_at)
+                            ? 'bg-destructive/10 text-destructive border border-destructive/20'
+                            : 'bg-success/10 text-success border border-success/20'
+                        }`}>
+                          {new Date() > new Date(selectedConversation.sla_due_at) ? 'Overdue' : 'On Time'}
+                        </div>
+                      )}
+                      {selectedConversation.priority && (
+                        <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          selectedConversation.priority === 'high'
+                            ? 'bg-destructive/10 text-destructive border border-destructive/20'
+                            : selectedConversation.priority === 'medium'
+                            ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
+                            : 'bg-success/10 text-success border border-success/20'
+                        }`}>
+                          {selectedConversation.priority === 'high' ? '🔴' : selectedConversation.priority === 'medium' ? '🟡' : '🟢'} {selectedConversation.priority}
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Segmented Control Bar */}
+                  <div className="px-6 pb-3 flex items-center">
+                    <div className="inline-flex w-full bg-muted/40 rounded-lg p-1 border border-border/50">
+                      <button
+                        onClick={() => openDrawer('customer')}
+                        className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                          drawerContent === 'customer' && drawerOpen
+                            ? 'bg-card shadow-sm text-foreground'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
+                        }`}
+                      >
+                        <User className="h-4 w-4 inline mr-2" />
+                        Customer Info
+                      </button>
+                      <button
+                        onClick={() => openDrawer('actions')}
+                        className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                          drawerContent === 'actions' && drawerOpen
+                            ? 'bg-card shadow-sm text-foreground'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
+                        }`}
+                      >
+                        <Zap className="h-4 w-4 inline mr-2" />
+                        Quick Actions
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Subtle Divider */}
+                  <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
                 </div>
 
-                {/* Conversation Content - Scrollable with Desktop Styling */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Conversation Content - Scrollable */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
                   <ConversationThread
                     conversation={selectedConversation}
                     onUpdate={handleUpdate}
