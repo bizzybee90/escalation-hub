@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Send, Sparkles, User, TrendingUp, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, AlertCircle, FileText, Sparkles, Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,7 +40,7 @@ export const MobileConversationView = ({
   const [replyText, setReplyText] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [showSuggestedReply, setShowSuggestedReply] = useState(false);
+  const [suggestedReplyOpen, setSuggestedReplyOpen] = useState(false);
   const { toast } = useToast();
 
   const handleResolve = async () => {
@@ -198,14 +198,14 @@ export const MobileConversationView = ({
               )}
 
               {/* Suggested Reply */}
-              <Collapsible open={showSuggestedReply} onOpenChange={setShowSuggestedReply}>
+              <Collapsible open={suggestedReplyOpen} onOpenChange={setSuggestedReplyOpen}>
                 <CollapsibleTrigger className="w-full">
                   <div className="flex items-center justify-between py-2">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                       Suggested Reply
                     </p>
                     <span className="text-[13px] text-primary font-medium">
-                      {showSuggestedReply ? 'Hide' : 'Show'}
+                      {suggestedReplyOpen ? 'Hide' : 'Show'}
                     </span>
                   </div>
                 </CollapsibleTrigger>
@@ -239,8 +239,8 @@ export const MobileConversationView = ({
             <Card className="rounded-[28px] p-6 bg-card border-border/50 shadow-sm">
               <div className="flex items-center gap-4 mb-4">
                 <Avatar className="h-12 w-12">
-                  <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                    <User className="h-6 w-6" />
+                  <AvatarFallback className="bg-primary/10 text-primary font-semibold text-[15px]">
+                    CU
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">

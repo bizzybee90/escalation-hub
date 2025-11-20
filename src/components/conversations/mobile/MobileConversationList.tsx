@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { Conversation } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -43,6 +44,22 @@ export const MobileConversationList = ({
       case 'low': return 'outline';
       default: return 'default';
     }
+  };
+
+  const getAccentBarColor = (conversation: Conversation) => {
+    const isOverdue = conversation.sla_due_at && new Date() > new Date(conversation.sla_due_at);
+    
+    if (isOverdue) return 'bg-red-500';
+    
+    const priority = conversation.priority;
+    if (priority === 'high') {
+      return 'bg-red-500';
+    } else if (priority === 'medium') {
+      return 'bg-yellow-500';
+    } else if (priority === 'low') {
+      return 'bg-green-500';
+    }
+    return 'bg-gray-300';
   };
 
   const isOverdue = (conversation: Conversation) => {
