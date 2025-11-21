@@ -238,13 +238,13 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
       />
       
       {selectedConversation && (
-        <div className="focus-mode-overlay animate-fade-in" onClick={handleClose} />
+        <div className="focus-mode-overlay animate-fade-in" style={{ zIndex: 39 }} onClick={handleClose} />
       )}
       
       <Dialog open={!!selectedConversation} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent 
-          className="max-w-none h-[100vh] md:h-[90vh] min-h-0 p-0 gap-0 animate-scale-in z-50 w-full md:w-auto"
-          style={{ width: window.innerWidth < 900 ? '100%' : `${modalWidth}%` }}
+          className="max-w-none h-[100vh] md:h-[90vh] min-h-0 p-0 gap-0 animate-scale-in w-full md:w-auto"
+          style={{ width: window.innerWidth < 900 ? '100%' : `${modalWidth}%`, zIndex: 40 }}
         >
           {/* Resize handle - left edge (hidden on mobile) */}
           <div 

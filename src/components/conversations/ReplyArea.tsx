@@ -28,13 +28,13 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
   const isTablet = useIsTablet();
   const isMobile = useIsMobile();
 
-  // Handle external draft text from AIContextPanel
+  // Handle external draft text from AIContextPanel or saved drafts
   useEffect(() => {
-    if (externalDraftText) {
+    if (externalDraftText && !draftUsed) {
       setReplyBody(externalDraftText);
-      onDraftTextCleared?.();
+      setDraftUsed(true);
     }
-  }, [externalDraftText, onDraftTextCleared]);
+  }, [externalDraftText, draftUsed]);
 
   // Keyboard shortcuts for sending
   useEffect(() => {
@@ -64,6 +64,8 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
     try {
       await onSend(replyBody, false);
       setReplyBody('');
+      setDraftUsed(false);
+      onDraftTextCleared?.();
       toast({ title: "Reply sent" });
     } catch (error) {
       toast({ title: "Failed to send", variant: "destructive" });

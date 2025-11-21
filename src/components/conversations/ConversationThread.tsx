@@ -8,6 +8,7 @@ import { ReplyArea } from './ReplyArea';
 import { MobileConversationView } from './MobileConversationView';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ConversationThreadProps {
   conversation: Conversation;
@@ -19,7 +20,25 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [draftText, setDraftText] = useState<string>('');
+  const [replyText, setReplyText] = useState<string>('');
   const isMobile = useIsMobile();
+
+  // Save draft when component unmounts or conversation changes
+  useEffect(() => {
+    return () => {
+      if (replyText.trim()) {
+        localStorage.setItem(`draft-${conversation.id}`, replyText);
+      }
+    };
+  }, [replyText, conversation.id]);
+
+  // Load draft on mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem(`draft-${conversation.id}`);
+    if (savedDraft) {
+      setReplyText(savedDraft);
+    }
+  }, [conversation.id]);
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -87,8 +106,26 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
         .eq('id', conversation.id);
     }
 
+    // Clear draft after successful send
+    localStorage.removeItem(`draft-${conversation.id}`);
+    setReplyText('');
+
     onUpdate();
   };
+
+  const handleReopen = async () => {
+    await supabase
+      .from('conversations')
+      .update({ 
+        status: 'open',
+        resolved_at: null
+      })
+      .eq('id', conversation.id);
+    
+    onUpdate();
+  };
+
+  const isCompleted = conversation.status === 'resolved';
 
   if (loading) {
     return (
@@ -111,12 +148,24 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
           onBack={onBack || (() => {})}
         />
 
-        <ReplyArea
-          conversationId={conversation.id}
-          channel={conversation.channel}
-          aiDraftResponse={conversation.metadata?.ai_draft_response as string}
-          onSend={handleReply}
-        />
+        {!isCompleted && (
+          <ReplyArea
+            conversationId={conversation.id}
+            channel={conversation.channel}
+            aiDraftResponse={conversation.metadata?.ai_draft_response as string}
+            onSend={handleReply}
+            externalDraftText={replyText}
+            onDraftTextCleared={() => setReplyText('')}
+          />
+        )}
+
+        {isCompleted && (
+          <div className="border-t border-border p-4 bg-muted/30">
+            <Button onClick={handleReopen} className="w-full">
+              Reopen Ticket
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -135,14 +184,27 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
         <MessageTimeline messages={messages} />
       </div>
 
-      <ReplyArea
-        conversationId={conversation.id}
-        channel={conversation.channel}
-        aiDraftResponse={conversation.metadata?.ai_draft_response as string}
-        onSend={handleReply}
-        externalDraftText={draftText}
-        onDraftTextCleared={() => setDraftText('')}
-      />
+      {!isCompleted && (
+        <ReplyArea
+          conversationId={conversation.id}
+          channel={conversation.channel}
+          aiDraftResponse={conversation.metadata?.ai_draft_response as string}
+          onSend={handleReply}
+          externalDraftText={draftText || replyText}
+          onDraftTextCleared={() => {
+            setDraftText('');
+            setReplyText('');
+          }}
+        />
+      )}
+
+      {isCompleted && (
+        <div className="border-t border-border p-4 bg-muted/30">
+          <Button onClick={handleReopen} className="w-full">
+            Reopen Ticket
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
