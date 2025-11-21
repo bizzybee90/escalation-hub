@@ -83,39 +83,44 @@ export const ConversationFilters = ({
   ];
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+    <div className="space-y-3">
       {filters.map((filter) => (
-        <div key={filter.label} className="flex gap-1.5 flex-shrink-0">
-          {filter.options.map((option) => {
-            const isSelected = option.isAll 
-              ? filter.value.length === 0 
-              : filter.value.includes(option.value);
-            
-            const handleClick = () => {
-              if (option.isAll) {
-                filter.onChange([]);
-              } else {
-                toggleFilter(filter.value, option.value, filter.onChange);
-              }
-            };
-            
-            return (
-              <Badge
-                key={option.value}
-                variant={isSelected ? 'default' : 'outline'}
-                className={cn(
-                  "rounded-full px-4 py-2 cursor-pointer transition-all duration-300 ease-out text-xs font-medium whitespace-nowrap",
-                  "active:scale-95",
-                  isSelected
-                    ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]" 
-                    : "hover:bg-accent hover:border-primary/30 hover:scale-[1.02]"
-                )}
-                onClick={handleClick}
-              >
-                {option.label}
-              </Badge>
-            );
-          })}
+        <div key={filter.label} className="flex flex-col gap-2">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            {filter.label}
+          </span>
+          <div className="flex gap-1.5 flex-wrap">
+            {filter.options.map((option) => {
+              const isSelected = option.isAll 
+                ? filter.value.length === 0 
+                : filter.value.includes(option.value);
+              
+              const handleClick = () => {
+                if (option.isAll) {
+                  filter.onChange([]);
+                } else {
+                  toggleFilter(filter.value, option.value, filter.onChange);
+                }
+              };
+              
+              return (
+                <Badge
+                  key={option.value}
+                  variant={isSelected ? 'default' : 'outline'}
+                  className={cn(
+                    "rounded-full px-3 py-1 cursor-pointer transition-all duration-200 text-xs font-medium whitespace-nowrap",
+                    "active:scale-95",
+                    isSelected
+                      ? "bg-primary text-primary-foreground shadow-sm" 
+                      : "hover:bg-accent hover:border-primary/30"
+                  )}
+                  onClick={handleClick}
+                >
+                  {option.label}
+                </Badge>
+              );
+            })}
+          </div>
         </div>
       ))}
     </div>
