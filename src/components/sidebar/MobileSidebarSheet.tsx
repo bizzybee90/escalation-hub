@@ -20,11 +20,11 @@ export const MobileSidebarSheet = ({ onNavigate }: MobileSidebarSheetProps) => {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button 
-          variant="ghost" 
+          variant="outline" 
           size="icon"
-          className="fixed top-4 left-4 z-50 h-10 w-10 rounded-full bg-background/95 backdrop-blur border border-border shadow-lg"
+          className="fixed top-4 left-4 z-[9999] h-12 w-12 rounded-full bg-background shadow-xl border-2"
         >
-          <Menu className="h-5 w-5" />
+          <Menu className="h-6 w-6" />
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[280px] p-0">
