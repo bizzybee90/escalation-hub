@@ -43,8 +43,7 @@ export const MobileConversationView = ({
   });
   const [isInternal, setIsInternal] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [aiDraftOpen, setAiDraftOpen] = useState(false);
-  const [suggestedStrategyOpen, setSuggestedStrategyOpen] = useState(false);
+  const [aiInsightsExpanded, setAiInsightsExpanded] = useState(false);
   const [snoozeDialogOpen, setSnoozeDialogOpen] = useState(false);
   const { toast } = useToast();
 
@@ -112,25 +111,25 @@ export const MobileConversationView = ({
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      {/* Sticky Header */}
-      <div className="flex-shrink-0 bg-background/95 backdrop-blur-lg border-b border-border sticky top-0 z-30">
-        <div className="flex items-center justify-between px-4 py-3">
+      {/* iOS-Style Header */}
+      <div className="flex-shrink-0 bg-background/95 backdrop-blur-lg border-b border-border/40 sticky top-0 z-30">
+        <div className="flex items-center justify-between px-4 py-3.5">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 -ml-2 p-2 rounded-lg hover:bg-muted/50 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 -ml-2 p-2 rounded-lg active:bg-muted/50 active:scale-95 transition-all"
           >
-            <ArrowLeft className="h-5 w-5 text-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Back</span>
+            <ArrowLeft className="h-5 w-5 text-primary" />
+            <span className="text-sm font-medium text-primary">Back</span>
           </button>
-          <div className="flex-1 min-w-0 mx-3">
-            <h2 className="text-sm font-semibold text-foreground truncate">
+          <div className="flex-1 min-w-0 mx-3 text-center">
+            <h2 className="text-base font-semibold text-foreground line-clamp-2 leading-tight">
               {conversation.title || 'Conversation'}
             </h2>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
-                <MoreVertical className="h-5 w-5" />
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0 -mr-2">
+                <MoreVertical className="h-5 w-5 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -141,6 +140,11 @@ export const MobileConversationView = ({
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Resolve
               </DropdownMenuItem>
+              {conversation.customer_id && (
+                <DropdownMenuItem>
+                  View Customer Details
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -148,198 +152,166 @@ export const MobileConversationView = ({
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="px-4 space-y-4 pb-44">
-          {/* Status Pills - compact row */}
-          <div className="flex items-center gap-2 flex-wrap pt-3">
-            <div className="flex items-center gap-1.5 px-2.5 h-7 rounded-full bg-muted/50">
-              <ChannelIcon channel={conversation.channel} className="h-3 w-3" />
-              <span className="text-[11px] font-medium capitalize">{conversation.channel}</span>
-            </div>
-
-            <Badge
-              variant={
-                conversation.priority === 'high'
-                  ? 'destructive'
-                  : conversation.priority === 'medium'
-                  ? 'secondary'
-                  : 'outline'
-              }
-              className="rounded-full text-[10px] font-semibold h-7 px-2.5 uppercase"
-            >
-              {conversation.priority || 'Medium'}
-            </Badge>
-
-            {isOverdue && (
-              <Badge variant="destructive" className="rounded-full text-[10px] font-semibold h-7 px-2.5 uppercase">
-                <AlertCircle className="h-3 w-3 mr-1" />
-                Overdue
-              </Badge>
-            )}
-            
-            {conversation.customer_id && (
-              <Badge variant="secondary" className="rounded-full text-[10px] font-semibold h-7 px-2.5">
-                <Crown className="h-3 w-3 mr-1" />
-                VIP
-              </Badge>
-            )}
-          </div>
-
-          {/* AI Insights Card - tighter spacing */}
+        <div className="px-4 pb-44">
+          {/* AI Insights Card - Collapsible, iOS-style */}
           {conversation.ai_reason_for_escalation && (
-            <Card className="rounded-3xl p-5 bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20 shadow-lg shadow-primary/10">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+            <Card className="mt-3 mb-4 rounded-2xl p-0 bg-background border-border/40 shadow-sm overflow-hidden">
+              <button
+                onClick={() => setAiInsightsExpanded(!aiInsightsExpanded)}
+                className="w-full p-4 flex items-start gap-3 active:bg-muted/30 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Sparkles className="h-4 w-4 text-primary" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-foreground">AI Insights</h3>
-                  {conversation.ai_confidence && (
-                    <p className="text-[11px] text-muted-foreground">
-                      {Math.round(conversation.ai_confidence * 100)}% confident
-                    </p>
-                  )}
+                <div className="flex-1 text-left min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-sm font-semibold text-foreground">AI Insights</h3>
+                    {conversation.ai_confidence && (
+                      <span className="text-xs text-muted-foreground">
+                        {Math.round(conversation.ai_confidence * 100)}% confident
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
+                    {conversation.ai_sentiment && `${getSentimentEmoji(conversation.ai_sentiment)} `}
+                    {conversation.summary_for_human || conversation.ai_reason_for_escalation}
+                  </p>
                 </div>
-              </div>
+                <ArrowLeft className={`h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform ${aiInsightsExpanded ? '-rotate-90' : 'rotate-180'}`} />
+              </button>
 
-              {/* Why Escalated */}
-              <div className="mb-3">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-                  Why Escalated
-                </p>
-                <p className="text-sm text-foreground leading-relaxed">
-                  {conversation.ai_reason_for_escalation}
-                </p>
-              </div>
+              {aiInsightsExpanded && (
+                <div className="px-4 pb-4 pt-0 space-y-3 border-t border-border/40 mt-0">
+                  {/* Why Escalated */}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 mt-3">
+                      Why Escalated
+                    </p>
+                    <p className="text-sm text-foreground leading-relaxed">
+                      {conversation.ai_reason_for_escalation}
+                    </p>
+                  </div>
 
-              {/* AI Draft - Collapsible */}
-              <Collapsible open={aiDraftOpen} onOpenChange={setAiDraftOpen}>
-                <CollapsibleTrigger className="w-full">
-                  <div className="flex items-center justify-between py-1.5">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {/* AI Draft */}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
                       AI Draft
                     </p>
-                    <span className="text-xs text-primary font-medium">
-                      {aiDraftOpen ? 'Hide' : 'Show'}
-                    </span>
+                    <div className="rounded-xl bg-muted/30 p-3">
+                      <p className="text-sm text-foreground leading-relaxed">
+                        Hi there! I completely understand your frustration and I'm here to help. I've looked into this issue and we can get this resolved for you within the next 24 hours. Would you like me to walk you through the solution steps now, or would you prefer we handle it on our end?
+                      </p>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setReplyText("Hi there! I completely understand your frustration and I'm here to help. I've looked into this issue and we can get this resolved for you within the next 24 hours. Would you like me to walk you through the solution steps now, or would you prefer we handle it on our end?");
+                        toast({ title: "Draft copied to reply" });
+                        setAiInsightsExpanded(false);
+                      }}
+                      className="mt-2 w-full text-xs h-8"
+                    >
+                      Use this draft
+                    </Button>
                   </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="rounded-2xl bg-background/60 p-3.5 mt-1.5">
-                    <p className="text-sm text-foreground leading-relaxed">
-                      Hi there! I completely understand your frustration and I'm here to help. I've looked into this issue and we can get this resolved for you within the next 24 hours. Would you like me to walk you through the solution steps now, or would you prefer we handle it on our end?
-                    </p>
-                  </div>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => {
-                      setReplyText("Hi there! I completely understand your frustration and I'm here to help. I've looked into this issue and we can get this resolved for you within the next 24 hours. Would you like me to walk you through the solution steps now, or would you prefer we handle it on our end?");
-                      toast({ title: "Draft copied to reply" });
-                    }}
-                    className="mt-1.5 w-full rounded-full text-xs h-8 font-semibold"
-                  >
-                    Use this draft
-                  </Button>
-                </CollapsibleContent>
-              </Collapsible>
 
-              {/* Suggested Strategy - Collapsible */}
-              <Collapsible open={suggestedStrategyOpen} onOpenChange={setSuggestedStrategyOpen}>
-                <CollapsibleTrigger className="w-full">
-                  <div className="flex items-center justify-between py-1.5">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Suggested Strategy
-                    </p>
-                    <span className="text-xs text-primary font-medium">
-                      {suggestedStrategyOpen ? 'Hide' : 'Show'}
-                    </span>
+                  {/* Tags */}
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                    {conversation.ai_sentiment && (
+                      <Badge variant="outline" className="rounded-full text-[10px] h-6 px-2.5">
+                        {conversation.ai_sentiment}
+                      </Badge>
+                    )}
+                    {conversation.category && (
+                      <Badge variant="outline" className="rounded-full text-[10px] h-6 px-2.5 capitalize">
+                        {conversation.category}
+                      </Badge>
+                    )}
+                    {conversation.priority && (
+                      <Badge
+                        variant={
+                          conversation.priority === 'high'
+                            ? 'destructive'
+                            : conversation.priority === 'medium'
+                            ? 'secondary'
+                            : 'outline'
+                        }
+                        className="rounded-full text-[10px] h-6 px-2.5 uppercase"
+                      >
+                        {conversation.priority}
+                      </Badge>
+                    )}
+                    {isOverdue && (
+                      <Badge variant="destructive" className="rounded-full text-[10px] h-6 px-2.5">
+                        Overdue
+                      </Badge>
+                    )}
                   </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="rounded-2xl bg-background/60 p-3.5 mt-1.5">
-                    <p className="text-sm text-foreground leading-relaxed">
-                      Based on the conversation, I recommend acknowledging their concern and offering a specific solution timeline.
-                    </p>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Tags */}
-              <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-                {conversation.ai_sentiment && (
-                  <Badge variant="outline" className="rounded-full text-[10px] h-6 px-2.5">
-                    {getSentimentEmoji(conversation.ai_sentiment)} {conversation.ai_sentiment}
-                  </Badge>
-                )}
-                {conversation.category && (
-                  <Badge variant="outline" className="rounded-full text-[10px] h-6 px-2.5 capitalize">
-                    {conversation.category}
-                  </Badge>
-                )}
-              </div>
+                </div>
+              )}
             </Card>
           )}
 
           {/* Conversation Timeline */}
-          <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2.5">
-              Conversation
-            </h3>
+          <div className="space-y-2">
             <MessageTimeline messages={messages} />
           </div>
         </div>
       </div>
 
-      {/* Fixed Composer - Only sticky element at bottom */}
-      <div className="flex-shrink-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl pb-safe">
-        <div className="px-4 py-3 space-y-2.5">
-          {/* Reply Type Toggle - compact */}
-          <div className="flex gap-1.5">
+      {/* iOS-Style Composer - Only sticky element at bottom */}
+      <div className="flex-shrink-0 bg-background rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.04)] border-t border-border/30 pb-safe">
+        <div className="px-4 py-3 space-y-3">
+          {/* Reply Type Toggle - iOS segmented control style */}
+          <div className="flex gap-1 p-1 bg-muted/40 rounded-full w-fit">
             <button
               onClick={() => setIsInternal(false)}
-              className={`px-3 h-7 rounded-full text-[11px] font-medium transition-all ${
+              className={`px-4 h-7 rounded-full text-xs font-medium transition-all ${
                 !isInternal
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted/50 text-muted-foreground'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground'
               }`}
             >
               Reply
             </button>
             <button
               onClick={() => setIsInternal(true)}
-              className={`px-3 h-7 rounded-full text-[11px] font-medium transition-all ${
+              className={`px-4 h-7 rounded-full text-xs font-medium transition-all ${
                 isInternal
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted/50 text-muted-foreground'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground'
               }`}
             >
               Note
             </button>
           </div>
 
-          {/* Message Input with Send Button - full width */}
-          <div className="relative">
-            <Textarea
-              value={replyText}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                setReplyText(newValue);
-                if (newValue) {
-                  localStorage.setItem(`draft-${conversation.id}`, newValue);
-                } else {
-                  localStorage.removeItem(`draft-${conversation.id}`);
-                }
-              }}
-              placeholder={isInternal ? "Add a note..." : "Type your reply..."}
-              className="w-full min-h-[44px] max-h-32 rounded-3xl resize-none text-sm pl-4 pr-12 py-3 border-border"
-            />
-            <button
-              onClick={handleSendReply}
-              disabled={!replyText.trim() || isSending}
-              className="absolute right-1.5 bottom-1.5 w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:shadow-md transition-all active:scale-95"
-            >
-              <Send className="h-4 w-4" />
-            </button>
+          {/* Message Input - iOS-style with inline send button */}
+          <div className="flex items-end gap-2">
+            <div className="flex-1 relative">
+              <Textarea
+                value={replyText}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  setReplyText(newValue);
+                  if (newValue) {
+                    localStorage.setItem(`draft-${conversation.id}`, newValue);
+                  } else {
+                    localStorage.removeItem(`draft-${conversation.id}`);
+                  }
+                }}
+                placeholder={isInternal ? "Add a note…" : "Type your reply…"}
+                className="w-full min-h-[44px] max-h-32 rounded-3xl resize-none text-base px-4 py-3 pr-12 border-border/50 bg-background focus:border-primary/50 transition-colors"
+              />
+              <button
+                onClick={handleSendReply}
+                disabled={!replyText.trim() || isSending}
+                className="absolute right-2 bottom-2 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 disabled:bg-muted transition-all active:scale-95"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
