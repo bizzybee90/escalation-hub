@@ -223,7 +223,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   return (
     <>
       <ThreeColumnLayout
-        sidebar={<Sidebar />}
+        sidebar={<Sidebar onNavigate={handleClose} />}
         main={
           <ConversationList
             filter={filter}

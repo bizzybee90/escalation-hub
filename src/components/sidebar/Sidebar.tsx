@@ -14,9 +14,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 interface SidebarProps {
   forceCollapsed?: boolean;
+  onNavigate?: () => void;
 }
 
-export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
+export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {}) => {
   const { interfaceMode, toggleMode, loading } = useInterfaceMode();
   const [collapsed, setCollapsed] = useState(false);
   
@@ -142,6 +143,7 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
                   <NavLink
                     to="/"
                     end
+                    onClick={onNavigate}
                     className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
@@ -165,6 +167,7 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
                 <div>
                   <NavLink
                     to="/unassigned"
+                    onClick={onNavigate}
                     className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
@@ -188,6 +191,7 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
                 <div>
                   <NavLink
                     to="/sla-risk"
+                    onClick={onNavigate}
                     className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
@@ -211,6 +215,7 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
                 <div>
                   <NavLink
                     to="/all-open"
+                    onClick={onNavigate}
                     className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
@@ -234,6 +239,7 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
               <div>
                 <NavLink
                   to="/completed"
+                  onClick={onNavigate}
                   className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                   activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                 >
@@ -266,6 +272,7 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
                 <div>
                   <NavLink
                     to="/high-priority"
+                    onClick={onNavigate}
                     className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
@@ -287,6 +294,7 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
                 <div>
                   <NavLink
                     to="/vip-customers"
+                    onClick={onNavigate}
                     className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
