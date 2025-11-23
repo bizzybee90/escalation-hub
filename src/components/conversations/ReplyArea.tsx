@@ -30,12 +30,18 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
   const isMobile = useIsMobile();
 
   // Handle external draft text from AIContextPanel or saved drafts
+  // Reset when conversation changes (conversationId changes)
   useEffect(() => {
-    if (externalDraftText && !draftUsed) {
+    setReplyBody(externalDraftText || '');
+    setDraftUsed(false);
+  }, [conversationId]);
+
+  // Update when external draft changes within same conversation
+  useEffect(() => {
+    if (externalDraftText) {
       setReplyBody(externalDraftText);
-      setDraftUsed(true);
     }
-  }, [externalDraftText, draftUsed]);
+  }, [externalDraftText]);
 
   // Keyboard shortcuts for sending
   useEffect(() => {
