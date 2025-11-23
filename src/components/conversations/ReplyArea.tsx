@@ -32,13 +32,15 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
   // Handle external draft text from AIContextPanel or saved drafts
   // Reset when conversation changes (conversationId changes)
   useEffect(() => {
+    console.log('🔄 ReplyArea conversation changed:', { conversationId, externalDraftText });
     setReplyBody(externalDraftText || '');
     setDraftUsed(false);
-  }, [conversationId]);
+  }, [conversationId, externalDraftText]);
 
   // Update when external draft changes within same conversation
   useEffect(() => {
-    if (externalDraftText) {
+    console.log('📝 ReplyArea external draft updated:', { externalDraftText });
+    if (externalDraftText !== undefined && externalDraftText !== replyBody) {
       setReplyBody(externalDraftText);
     }
   }, [externalDraftText]);
@@ -109,6 +111,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
               placeholder="Type your reply..."
               value={replyBody}
               onChange={(e) => {
+                console.log('⌨️ Textarea onChange:', { value: e.target.value, length: e.target.value.length });
                 setReplyBody(e.target.value);
                 onDraftChange?.(e.target.value);
               }}
