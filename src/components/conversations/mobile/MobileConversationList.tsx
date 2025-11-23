@@ -1,7 +1,7 @@
 import { Conversation } from '@/lib/types';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { Badge } from '@/components/ui/badge';
-import { Inbox, SlidersHorizontal } from 'lucide-react';
+import { Inbox, SlidersHorizontal, FileEdit } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import PullToRefresh from 'react-simple-pull-to-refresh';
@@ -39,7 +39,18 @@ export const MobileConversationList = ({
 }: MobileConversationListProps) => {
   const [isHeaderCompact, setIsHeaderCompact] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [conversationDrafts, setConversationDrafts] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Check for drafts in all conversations
+  useEffect(() => {
+    const drafts: Record<string, boolean> = {};
+    conversations.forEach(conv => {
+      const draft = localStorage.getItem(`draft-${conv.id}`);
+      drafts[conv.id] = !!draft && draft.trim().length > 0;
+    });
+    setConversationDrafts(drafts);
+  }, [conversations]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -200,6 +211,14 @@ export const MobileConversationList = ({
                             <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
                             {conversation.channel}
                           </Badge>
+
+                          {/* Draft Badge */}
+                          {conversationDrafts[conversation.id] && (
+                            <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
+                              <FileEdit className="h-3 w-3" />
+                              Draft
+                            </Badge>
+                          )}
                         </div>
 
                         {/* Meta Row */}
