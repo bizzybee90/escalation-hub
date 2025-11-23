@@ -25,7 +25,7 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
   const aiDraftResponse = conversation.metadata?.ai_draft_response as string | undefined;
 
 // Shared header classes for consistent iOS-style rows
-const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 py-3 gap-3 h-14";
+const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-3 h-14";
 
   const handleUseDraft = () => {
     if (!aiDraftResponse) return;
@@ -47,7 +47,7 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 py-3
     <div className="space-y-3 md:space-y-4 mobile-section-spacing">
       {/* Why AI Escalated */}
       <Collapsible open={isEscalationOpen} onOpenChange={setIsEscalationOpen}>
-        <Card className="card-elevation bg-destructive/5 border-destructive/20 mobile-native-card overflow-hidden">
+        <Card className="card-elevation bg-destructive/5 border-destructive/20 overflow-hidden">
           <CollapsibleTrigger className={PANEL_HEADER_CLASSES}>
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-destructive/10 text-destructive">
@@ -76,7 +76,7 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 py-3
 
       {/* AI Summary */}
       <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen}>
-        <Card className="card-elevation mobile-native-card bg-primary/5 border-primary/20 overflow-hidden">
+        <Card className="card-elevation bg-primary/5 border-primary/20 overflow-hidden">
           <CollapsibleTrigger className={PANEL_HEADER_CLASSES}>
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
