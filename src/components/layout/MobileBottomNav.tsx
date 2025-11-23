@@ -1,4 +1,4 @@
-import { Inbox, UserCircle, FolderOpen, Menu } from 'lucide-react';
+import { Inbox, UserCircle, FolderOpen, Menu, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -10,9 +10,27 @@ interface MobileBottomNavProps {
 }
 
 const navItems = [
-  { id: 'my-tickets' as const, icon: Inbox, label: 'My Tickets' },
-  { id: 'unassigned' as const, icon: UserCircle, label: 'Unassigned' },
-  { id: 'all-open' as const, icon: FolderOpen, label: 'All Open' },
+  { 
+    id: 'my-tickets' as const, 
+    icon: Inbox, 
+    label: 'My Tickets',
+    badgeBg: 'bg-primary/10',
+    iconColor: 'text-primary'
+  },
+  { 
+    id: 'unassigned' as const, 
+    icon: AlertTriangle, 
+    label: 'Unassigned',
+    badgeBg: 'bg-destructive/10',
+    iconColor: 'text-destructive'
+  },
+  { 
+    id: 'all-open' as const, 
+    icon: CheckCircle2, 
+    label: 'All Open',
+    badgeBg: 'bg-blue-500/10',
+    iconColor: 'text-blue-500'
+  },
 ];
 
 export const MobileBottomNav = ({ activeFilter, onNavigate, onMenuClick }: MobileBottomNavProps) => {
@@ -33,14 +51,14 @@ export const MobileBottomNav = ({ activeFilter, onNavigate, onMenuClick }: Mobil
   return (
     <nav
       className={cn(
-        'fixed bottom-0 inset-x-0 z-40',
+        'fixed bottom-0 inset-x-0 z-40 px-4',
         'transition-all duration-200 ease-out will-change-transform',
         isHidden ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
       )}
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}
     >
-      <div className="max-w-xl mx-auto bg-sidebar backdrop-blur-lg border-t border-border/20 shadow-[0_-8px_20px_rgba(0,0,0,0.3)]">
-        <div className="flex items-center justify-around px-2 py-1">
+      <div className="max-w-xl mx-auto bg-sidebar backdrop-blur-lg border border-sidebar-border rounded-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.4)]">
+        <div className="flex items-center justify-around px-2 py-2">
           {navItems.map((item) => {
             const isActive = item.id === activeFilter;
             const Icon = item.icon;
@@ -50,23 +68,28 @@ export const MobileBottomNav = ({ activeFilter, onNavigate, onMenuClick }: Mobil
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
                 className={cn(
-                  'flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-3',
-                  'min-h-[56px] rounded-lg transition-all duration-200',
+                  'flex-1 flex flex-col items-center justify-center gap-1.5 py-2 px-2',
+                  'min-h-[60px] rounded-xl transition-all duration-200',
                   'active:scale-95',
                   isActive && 'bg-sidebar-accent'
                 )}
               >
-                <Icon
-                  className={cn(
-                    'h-5 w-5 transition-colors',
-                    isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground/70'
-                  )}
-                  strokeWidth={isActive ? 2.5 : 2}
-                />
+                <div className={cn(
+                  'flex items-center justify-center w-8 h-8 rounded-md transition-all',
+                  isActive ? item.badgeBg : 'bg-transparent'
+                )}>
+                  <Icon
+                    className={cn(
+                      'h-5 w-5 transition-colors',
+                      isActive ? item.iconColor : 'text-sidebar-foreground/60'
+                    )}
+                    strokeWidth={isActive ? 2.5 : 2}
+                  />
+                </div>
                 <span
                   className={cn(
-                    'text-xs font-medium transition-colors',
-                    isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground/70'
+                    'text-[10px] font-medium transition-colors leading-tight',
+                    isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground/60'
                   )}
                 >
                   {item.label}
@@ -79,16 +102,18 @@ export const MobileBottomNav = ({ activeFilter, onNavigate, onMenuClick }: Mobil
           <button
             onClick={onMenuClick}
             className={cn(
-              'flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-3',
-              'min-h-[56px] rounded-lg transition-all duration-200',
+              'flex-1 flex flex-col items-center justify-center gap-1.5 py-2 px-2',
+              'min-h-[60px] rounded-xl transition-all duration-200',
               'active:scale-95'
             )}
           >
-            <Menu
-              className="h-5 w-5 text-sidebar-foreground/70 transition-colors"
-              strokeWidth={2}
-            />
-            <span className="text-xs font-medium text-sidebar-foreground/70 transition-colors">
+            <div className="flex items-center justify-center w-8 h-8 rounded-md">
+              <Menu
+                className="h-5 w-5 text-sidebar-foreground/60 transition-colors"
+                strokeWidth={2}
+              />
+            </div>
+            <span className="text-[10px] font-medium text-sidebar-foreground/60 transition-colors leading-tight">
               Menu
             </span>
           </button>
