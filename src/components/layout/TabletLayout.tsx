@@ -180,7 +180,7 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
     <div className="flex h-screen w-full bg-background overflow-hidden">
       {/* Sidebar - with data attribute for layout validator */}
       <div data-sidebar className="flex-shrink-0 border-r border-border/40 bg-card shadow-sm">
-        <Sidebar />
+        <Sidebar onNavigate={handleBackToList} />
       </div>
 
       {/* Main Content Area - with data attribute for layout validator */}
