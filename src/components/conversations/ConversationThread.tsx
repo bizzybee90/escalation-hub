@@ -35,12 +35,11 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
     }
   }, [replyText, conversation.id]);
 
-  // Load draft on mount
+  // Load draft and reset state when conversation changes
   useEffect(() => {
     const savedDraft = localStorage.getItem(`draft-${conversation.id}`);
-    if (savedDraft) {
-      setReplyText(savedDraft);
-    }
+    setReplyText(savedDraft || '');
+    setDraftText('');
   }, [conversation.id]);
 
   useEffect(() => {
