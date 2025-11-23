@@ -19,13 +19,20 @@ export const MobileSidebarSheet = ({ onNavigate }: MobileSidebarSheetProps) => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="icon"
-          className="fixed top-4 left-4 z-[9999] h-12 w-12 rounded-full p-0"
+        <button 
+          className="fixed top-4 left-4 z-[9999] p-2 group"
+          aria-label="Open menu"
         >
-          <img src={beeLogo} alt="Menu" className="h-8 w-8" />
-        </Button>
+          <div className="relative">
+            <img 
+              src={beeLogo} 
+              alt="Menu" 
+              className="h-10 w-10 transition-all duration-300 group-hover:scale-110 group-active:scale-95 drop-shadow-md" 
+            />
+            {/* Subtle pulse ring to indicate interactivity */}
+            <div className="absolute inset-0 rounded-full bg-primary/20 animate-pulse opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 blur-md" />
+          </div>
+        </button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[280px] p-0">
         <Sidebar onNavigate={handleNavigate} />
