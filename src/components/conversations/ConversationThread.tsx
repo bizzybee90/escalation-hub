@@ -28,16 +28,20 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
 
   // Auto-save draft instantly (no debounce, no notification)
   useEffect(() => {
+    console.log('💾 Draft auto-save:', { conversationId: conversation.id, replyText, length: replyText.length });
     if (replyText.trim()) {
       localStorage.setItem(`draft-${conversation.id}`, replyText);
+      console.log('✅ Draft saved to localStorage');
     } else {
       localStorage.removeItem(`draft-${conversation.id}`);
+      console.log('🗑️ Draft removed from localStorage');
     }
   }, [replyText, conversation.id]);
 
   // Load draft and reset state when conversation changes
   useEffect(() => {
     const savedDraft = localStorage.getItem(`draft-${conversation.id}`);
+    console.log('📖 Loading draft for conversation:', { conversationId: conversation.id, savedDraft });
     setReplyText(savedDraft || '');
     setDraftText('');
   }, [conversation.id]);
