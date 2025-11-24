@@ -7,6 +7,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import WebhookLogs from "./pages/WebhookLogs";
+import Privacy from "./pages/Privacy";
 import { EscalationHub } from "./pages/EscalationHub";
 import { MobileEscalationHub } from "./pages/mobile/MobileEscalationHub";
 import { AuthGuard } from "./components/AuthGuard";
@@ -120,6 +121,7 @@ const RouterContent = () => {
           </AuthGuard>
         } 
       />
+      <Route path="/privacy" element={<Privacy />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>

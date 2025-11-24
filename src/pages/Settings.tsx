@@ -4,6 +4,7 @@ import { DataDeletionPanel } from '@/components/settings/DataDeletionPanel';
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
 import { RetentionPolicyPanel } from '@/components/settings/RetentionPolicyPanel';
 import { InterfaceModeToggle } from '@/components/settings/InterfaceModeToggle';
+import { GDPRDashboard } from '@/components/settings/GDPRDashboard';
 import { Card } from '@/components/ui/card';
 
 export default function Settings() {
@@ -15,8 +16,9 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="interface" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
           <TabsTrigger value="interface">Interface</TabsTrigger>
+          <TabsTrigger value="gdpr">GDPR</TabsTrigger>
           <TabsTrigger value="export">Data Export</TabsTrigger>
           <TabsTrigger value="deletion">Data Deletion</TabsTrigger>
           <TabsTrigger value="retention">Retention Policy</TabsTrigger>
@@ -25,6 +27,10 @@ export default function Settings() {
 
         <TabsContent value="interface" className="space-y-4">
           <InterfaceModeToggle />
+        </TabsContent>
+
+        <TabsContent value="gdpr">
+          <GDPRDashboard />
         </TabsContent>
 
         <TabsContent value="export">

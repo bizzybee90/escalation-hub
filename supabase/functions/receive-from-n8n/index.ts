@@ -14,6 +14,13 @@ serve(async (req) => {
   const startTime = Date.now();
   let webhookLogId: string | null = null;
 
+  // IP validation
+  const requestIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+                    req.headers.get('x-real-ip') || 
+                    'unknown';
+  
+  console.log('Incoming webhook from IP:', requestIp);
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -21,6 +28,41 @@ serve(async (req) => {
 
     const payload = await req.json();
     console.log('Received webhook from N8n:', payload);
+
+    // Check IP allowlist if workspace_id is provided
+    if (payload.workspace_id) {
+      const { data: allowedIps } = await supabase
+        .from('allowed_webhook_ips')
+        .select('ip_address')
+        .eq('workspace_id', payload.workspace_id)
+        .eq('enabled', true);
+
+      if (allowedIps && allowedIps.length > 0) {
+        const isAllowed = allowedIps.some(row => row.ip_address === requestIp);
+        
+        if (!isAllowed) {
+          console.error('IP not in allowlist:', requestIp);
+          
+          await supabase.from('webhook_logs').insert({
+            direction: 'inbound',
+            webhook_url: req.url,
+            payload: payload,
+            status_code: 403,
+            error_message: `IP ${requestIp} not in allowlist`,
+          });
+
+          return new Response(
+            JSON.stringify({ error: 'Unauthorized IP address' }),
+            { 
+              status: 403, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+        
+        console.log('IP validated successfully:', requestIp);
+      }
+    }
 
     // Extract data from N8n payload
     const {
