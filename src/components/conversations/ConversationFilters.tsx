@@ -9,6 +9,8 @@ interface ConversationFiltersProps {
   setChannelFilter: (value: string[]) => void;
   categoryFilter: string[];
   setCategoryFilter: (value: string[]) => void;
+  conversationTypeFilter?: string[];
+  setConversationTypeFilter?: (value: string[]) => void;
 }
 
 export const ConversationFilters = ({
@@ -19,7 +21,9 @@ export const ConversationFilters = ({
   channelFilter,
   setChannelFilter,
   categoryFilter,
-  setCategoryFilter
+  setCategoryFilter,
+  conversationTypeFilter,
+  setConversationTypeFilter
 }: ConversationFiltersProps) => {
   const toggleFilter = (currentValues: string[], value: string, onChange: (values: string[]) => void) => {
     if (currentValues.includes(value)) {
@@ -80,6 +84,20 @@ export const ConversationFilters = ({
       ]
     },
   ];
+
+  // Add conversation type filter if provided
+  if (conversationTypeFilter && setConversationTypeFilter) {
+    filters.push({
+      label: 'Type',
+      value: conversationTypeFilter,
+      onChange: setConversationTypeFilter,
+      options: [
+        { label: 'All', value: '__all__', isAll: true },
+        { label: '🤖 AI', value: 'ai_handled' },
+        { label: '🧑 Escalated', value: 'escalated' },
+      ]
+    });
+  }
 
   return (
     <div className="space-y-6">

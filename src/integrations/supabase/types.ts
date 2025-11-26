@@ -52,16 +52,22 @@ export type Database = {
       conversations: {
         Row: {
           ai_confidence: number | null
+          ai_message_count: number | null
           ai_reason_for_escalation: string | null
+          ai_resolution_summary: string | null
           ai_sentiment: string | null
           assigned_to: string | null
           category: string | null
           channel: string
+          conversation_type: string | null
           created_at: string | null
           customer_id: string | null
+          escalated_at: string | null
           external_conversation_id: string | null
           first_response_at: string | null
           id: string
+          is_escalated: boolean | null
+          message_count: number | null
           metadata: Json | null
           priority: string | null
           resolved_at: string | null
@@ -77,16 +83,22 @@ export type Database = {
         }
         Insert: {
           ai_confidence?: number | null
+          ai_message_count?: number | null
           ai_reason_for_escalation?: string | null
+          ai_resolution_summary?: string | null
           ai_sentiment?: string | null
           assigned_to?: string | null
           category?: string | null
           channel: string
+          conversation_type?: string | null
           created_at?: string | null
           customer_id?: string | null
+          escalated_at?: string | null
           external_conversation_id?: string | null
           first_response_at?: string | null
           id?: string
+          is_escalated?: boolean | null
+          message_count?: number | null
           metadata?: Json | null
           priority?: string | null
           resolved_at?: string | null
@@ -102,16 +114,22 @@ export type Database = {
         }
         Update: {
           ai_confidence?: number | null
+          ai_message_count?: number | null
           ai_reason_for_escalation?: string | null
+          ai_resolution_summary?: string | null
           ai_sentiment?: string | null
           assigned_to?: string | null
           category?: string | null
           channel?: string
+          conversation_type?: string | null
           created_at?: string | null
           customer_id?: string | null
+          escalated_at?: string | null
           external_conversation_id?: string | null
           first_response_at?: string | null
           id?: string
+          is_escalated?: boolean | null
+          message_count?: number | null
           metadata?: Json | null
           priority?: string | null
           resolved_at?: string | null
