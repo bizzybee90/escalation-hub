@@ -6,6 +6,7 @@ import { RetentionPolicyPanel } from '@/components/settings/RetentionPolicyPanel
 import { InterfaceModeToggle } from '@/components/settings/InterfaceModeToggle';
 import { GDPRDashboard } from '@/components/settings/GDPRDashboard';
 import { CustomerMergePanel } from '@/components/settings/CustomerMergePanel';
+import { AIActivityWidget } from '@/components/dashboard/AIActivityWidget';
 import { Card } from '@/components/ui/card';
 
 export default function Settings() {
@@ -16,8 +17,9 @@ export default function Settings() {
         <p className="text-muted-foreground mt-2">Manage your workspace settings, GDPR compliance, and data policies.</p>
       </div>
 
-      <Tabs defaultValue="interface" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-7">
+      <Tabs defaultValue="dashboard" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-8">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="interface">Interface</TabsTrigger>
           <TabsTrigger value="gdpr">GDPR</TabsTrigger>
           <TabsTrigger value="cleanup">Cleanup</TabsTrigger>
@@ -26,6 +28,12 @@ export default function Settings() {
           <TabsTrigger value="retention">Retention Policy</TabsTrigger>
           <TabsTrigger value="audit">Audit Logs</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="dashboard" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <AIActivityWidget />
+          </div>
+        </TabsContent>
 
         <TabsContent value="interface" className="space-y-4">
           <InterfaceModeToggle />
