@@ -49,9 +49,9 @@ serve(async (req) => {
         );
       }
     } else if (action === 'resolution') {
-      if (!conversation_id) {
+      if (!conversation_id && !customer_identifier) {
         return new Response(
-          JSON.stringify({ error: 'Missing required field: conversation_id' }),
+          JSON.stringify({ error: 'Missing required field: conversation_id or customer_identifier' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         );
       }
@@ -201,6 +201,49 @@ serve(async (req) => {
 
     // Handle resolution action
     if (action === 'resolution') {
+      let resolveConversationId = conversation_id;
+
+      // If conversation_id not provided, find most recent open conversation
+      if (!resolveConversationId && customer_identifier) {
+        console.log('🔍 Auto-finding conversation for customer:', customer_identifier);
+
+        // Find customer first
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('workspace_id', workspace_id)
+          .or(`email.eq.${customer_email || ''},phone.eq.${customer_phone || ''}`)
+          .limit(1)
+          .single();
+
+        if (!customer) {
+          return new Response(
+            JSON.stringify({ error: 'Customer not found' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+          );
+        }
+
+        // Find most recent non-resolved conversation
+        const { data: openConversations } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('customer_id', customer.id)
+          .eq('channel', channel || 'whatsapp')
+          .in('status', ['new', 'open', 'pending'])
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (!openConversations || openConversations.length === 0) {
+          return new Response(
+            JSON.stringify({ error: 'No open conversation found for this customer' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+          );
+        }
+
+        resolveConversationId = openConversations[0].id;
+        console.log('✅ Found conversation to resolve:', resolveConversationId);
+      }
+
       const { error: updateError } = await supabase
         .from('conversations')
         .update({
@@ -208,16 +251,16 @@ serve(async (req) => {
           resolved_at: new Date().toISOString(),
           ai_resolution_summary: resolution_summary
         })
-        .eq('id', conversation_id);
+        .eq('id', resolveConversationId);
 
       if (updateError) throw updateError;
 
-      console.log('✅ Conversation resolved:', conversation_id);
+      console.log('✅ Conversation resolved:', resolveConversationId);
 
       return new Response(
         JSON.stringify({ 
           success: true, 
-          conversation_id,
+          conversation_id: resolveConversationId,
           message: 'Conversation resolved successfully' 
         }),
         { 
