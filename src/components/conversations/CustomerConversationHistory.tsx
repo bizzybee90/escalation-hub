@@ -29,12 +29,13 @@ export const CustomerConversationHistory = ({
 
   const fetchConversations = async () => {
     try {
+      // Fetch ALL conversations (both escalated and AI-handled)
       const { data, error } = await supabase
         .from('conversations')
         .select('*')
         .eq('customer_id', customerId)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (error) throw error;
       setConversations(data || []);
@@ -122,16 +123,28 @@ export const CustomerConversationHistory = ({
                     {conversation.title || `${conversation.channel} conversation`}
                   </span>
                 </div>
-                <Badge 
-                  variant="secondary" 
-                  className={`text-xs ${getStatusColor(conversation.status || 'new')}`}
-                >
-                  {conversation.status}
-                </Badge>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {/* AI vs Escalated badge */}
+                  {conversation.is_escalated ? (
+                    <Badge variant="secondary" className="text-xs bg-warning/10 text-warning hover:bg-warning/20">
+                      🧑 Escalated
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs bg-success/10 text-success hover:bg-success/20">
+                      🤖 AI
+                    </Badge>
+                  )}
+                  <Badge 
+                    variant="secondary" 
+                    className={`text-xs ${getStatusColor(conversation.status || 'new')}`}
+                  >
+                    {conversation.status}
+                  </Badge>
+                </div>
               </div>
 
               {/* Metadata */}
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                 <div className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
                   <span>{formatDistanceToNow(new Date(conversation.created_at || ''), { addSuffix: true })}</span>
@@ -145,6 +158,16 @@ export const CustomerConversationHistory = ({
                   <Badge variant="outline" className="text-xs px-1.5 py-0">
                     {conversation.category}
                   </Badge>
+                )}
+                {/* Message counts */}
+                {conversation.message_count > 0 && (
+                  <div className="flex items-center gap-1">
+                    <MessageSquare className="h-3 w-3" />
+                    <span>{conversation.message_count} msg{conversation.message_count !== 1 ? 's' : ''}</span>
+                    {conversation.ai_message_count > 0 && (
+                      <span className="text-success">({conversation.ai_message_count} AI)</span>
+                    )}
+                  </div>
                 )}
               </div>
 

@@ -227,10 +227,9 @@ serve(async (req) => {
     // Step 2: Find existing open conversation or create new one
     let conversation;
     
-    console.log('🔍 Looking for existing open conversation for customer:', customerId, 'channel:', channel);
+    console.log('🔍 Looking for existing conversation (escalated or not) for customer:', customerId, 'channel:', channel);
     
-    // Look for existing open conversation for this customer and channel
-    // Use limit(1) instead of maybeSingle() to handle potential duplicates
+    // Look for ANY existing conversation for this customer and channel (escalated or not)
     const { data: existingConversations } = await supabase
       .from('conversations')
       .select('*')
@@ -243,10 +242,34 @@ serve(async (req) => {
     const existingConversation = existingConversations?.[0];
 
     if (existingConversation) {
-      console.log('✅ REUSING existing open conversation:', existingConversation.id, 'status:', existingConversation.status, '(Duplicate prevention: blocking new conversation creation)');
-      conversation = existingConversation;
+      // Check if this conversation was previously AI-handled (not escalated)
+      if (!existingConversation.is_escalated) {
+        console.log('🔄 ESCALATING existing AI-handled conversation:', existingConversation.id);
+        
+        // Update conversation to mark as escalated
+        await supabase
+          .from('conversations')
+          .update({
+            is_escalated: true,
+            escalated_at: new Date().toISOString(),
+            conversation_type: 'escalated',
+            ai_reason_for_escalation: ai_reason_for_escalation || 'Manual escalation from AI',
+            status: 'open',
+            priority: priority || existingConversation.priority,
+            category: category || existingConversation.category,
+            metadata: { ...existingConversation.metadata, ...metadata }
+          })
+          .eq('id', existingConversation.id);
+        
+        conversation = existingConversation;
+        console.log('✅ Updated conversation to escalated status');
+      } else {
+        // Already escalated, just reuse it
+        console.log('✅ REUSING existing escalated conversation:', existingConversation.id);
+        conversation = existingConversation;
+      }
     } else {
-      console.log('➕ No existing open conversation found, creating NEW conversation for customer:', customerId, 'channel:', channel);
+      console.log('➕ No existing conversation found, creating NEW escalated conversation');
       const conversationMetadata: any = { ...metadata };
       if (ai_draft_response) {
         conversationMetadata.ai_draft_response = ai_draft_response;
@@ -267,10 +290,15 @@ serve(async (req) => {
           priority,
           category,
           status: 'new',
+          is_escalated: true,
+          escalated_at: new Date().toISOString(),
+          conversation_type: 'escalated',
           ai_reason_for_escalation,
           summary_for_human,
           ai_confidence: ai_confidence ? parseFloat(ai_confidence) : null,
           ai_sentiment,
+          message_count: 0,
+          ai_message_count: 0,
           metadata: conversationMetadata,
         })
         .select()
