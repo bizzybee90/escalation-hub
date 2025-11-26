@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,6 +28,16 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
   const { toast } = useToast();
   const isTablet = useIsTablet();
   const isMobile = useIsMobile();
+  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea
+  const adjustTextareaHeight = (textarea: HTMLTextAreaElement | null) => {
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 300)}px`;
+    }
+  };
 
   // Load saved draft when conversation changes
   useEffect(() => {
@@ -44,8 +54,18 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
     if (externalDraftText && externalDraftText !== replyBody && !draftUsed) {
       setReplyBody(externalDraftText);
       setDraftUsed(true);
+      setTimeout(() => adjustTextareaHeight(replyTextareaRef.current), 0);
     }
   }, [externalDraftText]);
+
+  // Adjust textarea height when content changes
+  useEffect(() => {
+    adjustTextareaHeight(replyTextareaRef.current);
+  }, [replyBody]);
+
+  useEffect(() => {
+    adjustTextareaHeight(noteTextareaRef.current);
+  }, [noteBody]);
 
   // Keyboard shortcuts for sending
   useEffect(() => {
@@ -113,6 +133,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
           <TabsContent value="reply" className="mt-0">
             <div className="flex items-center gap-2">
               <Textarea
+                ref={replyTextareaRef}
                 placeholder="Type your reply..."
                 value={replyBody}
                 onChange={(e) => {
@@ -131,11 +152,10 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
                   
                   onDraftChange?.(newValue);
                 }}
-                rows={isMobile ? 3 : 2}
                 className={
                   useMobileStyle
-                    ? "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-sm min-h-[80px] rounded-2xl bg-background shadow-sm flex-1"
-                    : "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-base min-h-[56px] rounded-xl bg-background shadow-sm flex-1"
+                    ? "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-sm min-h-[80px] max-h-[300px] rounded-2xl bg-background shadow-sm flex-1 overflow-y-auto"
+                    : "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-base min-h-[56px] max-h-[300px] rounded-xl bg-background shadow-sm flex-1 overflow-y-auto"
                 }
               />
               <Button 
@@ -156,14 +176,14 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
           <TabsContent value="note" className="mt-0">
             <div className="flex items-center gap-2">
               <Textarea
+                ref={noteTextareaRef}
                 placeholder="Add an internal note..."
                 value={noteBody}
                 onChange={(e) => setNoteBody(e.target.value)}
-                rows={isMobile ? 3 : 2}
                 className={
                   useMobileStyle
-                    ? "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-sm min-h-[80px] rounded-2xl bg-background shadow-sm flex-1"
-                    : "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-base min-h-[56px] rounded-xl bg-background shadow-sm flex-1"
+                    ? "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-sm min-h-[80px] max-h-[300px] rounded-2xl bg-background shadow-sm flex-1 overflow-y-auto"
+                    : "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-base min-h-[56px] max-h-[300px] rounded-xl bg-background shadow-sm flex-1 overflow-y-auto"
                 }
               />
               <Button 
