@@ -167,15 +167,27 @@ serve(async (req) => {
 
     // Step 1: Create or update customer
     let customerId: string;
-    const { data: existingCustomer } = await supabase
+    
+    // Build customer lookup query - handle null email properly
+    let customerQuery = supabase
       .from('customers')
       .select('id')
-      .eq('workspace_id', workspace_id)
-      .or(`email.eq.${customer_email || ''},phone.eq.${customer_phone || ''}`)
-      .maybeSingle();
+      .eq('workspace_id', workspace_id);
+    
+    // Add OR condition based on what identifiers we have
+    const orConditions: string[] = [];
+    if (customer_email) orConditions.push(`email.eq.${customer_email}`);
+    if (customer_phone) orConditions.push(`phone.eq.${customer_phone}`);
+    
+    if (orConditions.length > 0) {
+      customerQuery = customerQuery.or(orConditions.join(','));
+    }
+    
+    const { data: existingCustomer } = await customerQuery.maybeSingle();
 
     if (existingCustomer) {
       customerId = existingCustomer.id;
+      console.log('Found existing customer:', customerId);
       // Update customer if new info provided
       await supabase
         .from('customers')
@@ -187,6 +199,7 @@ serve(async (req) => {
         })
         .eq('id', customerId);
     } else {
+      console.log('Creating new customer');
       // Create new customer
       const { data: newCustomer, error: customerError } = await supabase
         .from('customers')
@@ -210,6 +223,8 @@ serve(async (req) => {
     // Step 2: Find existing open conversation or create new one
     let conversation;
     
+    console.log('Looking for existing conversation for customer:', customerId, 'channel:', channel);
+    
     // Look for existing open conversation for this customer and channel
     const { data: existingConversation } = await supabase
       .from('conversations')
@@ -222,10 +237,10 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingConversation) {
-      console.log('Found existing open conversation:', existingConversation.id);
+      console.log('Found existing open conversation:', existingConversation.id, 'status:', existingConversation.status);
       conversation = existingConversation;
     } else {
-      console.log('Creating new conversation');
+      console.log('No existing open conversation found, creating new conversation');
       const conversationMetadata: any = { ...metadata };
       if (ai_draft_response) {
         conversationMetadata.ai_draft_response = ai_draft_response;
