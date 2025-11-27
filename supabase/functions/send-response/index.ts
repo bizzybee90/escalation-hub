@@ -43,47 +43,86 @@ serve(async (req) => {
       messagePreview: sendRequest.message.substring(0, 50)
     });
 
-    let twilioResponse;
-    let from: string;
-    let to: string;
+    let messageId: string;
+    let messageStatus: string;
 
-    // Format numbers and send based on channel
-    if (sendRequest.channel === 'whatsapp') {
-      from = `whatsapp:${twilioPhoneNumber}`;
-      to = `whatsapp:${sendRequest.to}`;
+    // Handle email channel via Postmark
+    if (sendRequest.channel === 'email') {
+      const postmarkApiKey = Deno.env.get('POSTMARK_API_KEY');
+      if (!postmarkApiKey) {
+        throw new Error('Postmark API key not configured');
+      }
+
+      console.log('Sending email via Postmark...');
+      const emailRes = await fetch('https://api.postmarkapp.com/email', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Postmark-Server-Token': postmarkApiKey,
+        },
+        body: JSON.stringify({
+          From: 'support@bizzybee.io',
+          To: sendRequest.to,
+          Subject: sendRequest.metadata?.subject || 'Re: Your inquiry',
+          TextBody: sendRequest.message,
+          MessageStream: 'outbound',
+        }),
+      });
+
+      if (!emailRes.ok) {
+        const errorText = await emailRes.text();
+        console.error('Postmark API error:', emailRes.status, errorText);
+        throw new Error(`Postmark error: ${emailRes.status} - ${errorText}`);
+      }
+
+      const emailResponse = await emailRes.json();
+      messageId = emailResponse.MessageID;
+      messageStatus = 'sent';
+      console.log('Email sent via Postmark:', messageId);
     } else {
-      // SMS
-      from = twilioPhoneNumber;
-      to = sendRequest.to;
+      // Handle SMS/WhatsApp via Twilio
+      let from: string;
+      let to: string;
+
+      if (sendRequest.channel === 'whatsapp') {
+        from = `whatsapp:${twilioPhoneNumber}`;
+        to = `whatsapp:${sendRequest.to}`;
+      } else {
+        // SMS
+        from = twilioPhoneNumber;
+        to = sendRequest.to;
+      }
+
+      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
+      const auth = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
+
+      const formData = new URLSearchParams();
+      formData.append('From', from);
+      formData.append('To', to);
+      formData.append('Body', sendRequest.message);
+
+      console.log('Calling Twilio API...');
+      const twilioRes = await fetch(twilioUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData,
+      });
+
+      if (!twilioRes.ok) {
+        const errorText = await twilioRes.text();
+        console.error('Twilio API error:', twilioRes.status, errorText);
+        throw new Error(`Twilio error: ${twilioRes.status} - ${errorText}`);
+      }
+
+      const twilioResponse = await twilioRes.json();
+      messageId = twilioResponse.sid;
+      messageStatus = twilioResponse.status;
+      console.log('Message sent via Twilio:', messageId);
     }
-
-    // Send via Twilio
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
-    const auth = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
-
-    const formData = new URLSearchParams();
-    formData.append('From', from);
-    formData.append('To', to);
-    formData.append('Body', sendRequest.message);
-
-    console.log('Calling Twilio API...');
-    const twilioRes = await fetch(twilioUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formData,
-    });
-
-    if (!twilioRes.ok) {
-      const errorText = await twilioRes.text();
-      console.error('Twilio API error:', twilioRes.status, errorText);
-      throw new Error(`Twilio error: ${twilioRes.status} - ${errorText}`);
-    }
-
-    twilioResponse = await twilioRes.json();
-    console.log('Message sent via Twilio:', twilioResponse.sid);
 
     // Get conversation to find customer
     const { data: conversation } = await supabase
@@ -108,8 +147,8 @@ serve(async (req) => {
         body: sendRequest.message,
         raw_payload: {
           ...sendRequest.metadata,
-          twilioSid: twilioResponse.sid,
-          twilioStatus: twilioResponse.status
+          messageId: messageId,
+          messageStatus: messageStatus
         }
       });
 
@@ -130,8 +169,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        twilioSid: twilioResponse.sid,
-        status: twilioResponse.status,
+        messageId: messageId,
+        status: messageStatus,
         channel: sendRequest.channel
       }),
       {
