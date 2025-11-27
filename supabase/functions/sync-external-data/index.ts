@@ -184,25 +184,50 @@ async function syncFAQDatabase(
   };
 
   try {
-    // Fetch external FAQs
-    let query = externalSupabase.from('faq_database').select('*');
-    
-    if (!fullSync) {
-      // Incremental sync - only get recently updated
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      query = query.gte('updated_at', oneDayAgo);
-    }
+    // Fetch ALL external FAQs using pagination
+    let allFAQs: any[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let hasMore = true;
 
     console.log('Fetching FAQs with fullSync:', fullSync);
-    const { data: externalFAQs, error } = await query;
 
-    if (error) {
-      console.error('Error fetching external FAQs:', error);
-      throw error;
+    while (hasMore) {
+      let query = externalSupabase
+        .from('faq_database')
+        .select('*')
+        .range(from, from + batchSize - 1);
+      
+      if (!fullSync) {
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        query = query.gte('updated_at', oneDayAgo);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching external FAQs:', error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+      } else {
+        allFAQs = allFAQs.concat(data);
+        console.log(`Fetched batch: ${data.length} FAQs (total: ${allFAQs.length})`);
+        
+        if (data.length < batchSize) {
+          hasMore = false;
+        } else {
+          from += batchSize;
+        }
+      }
     }
 
-    stats.fetched = externalFAQs?.length || 0;
-    console.log(`Fetched ${stats.fetched} FAQs from external database`);
+    stats.fetched = allFAQs.length;
+    console.log(`Fetched ${stats.fetched} FAQs total from external database`);
+
+    const externalFAQs = allFAQs;
 
     // Process each FAQ
     for (const externalFAQ of externalFAQs || []) {
@@ -285,20 +310,42 @@ async function syncPriceList(
   };
 
   try {
-    // Fetch external prices
-    let query = externalSupabase.from('price_list').select('*');
-    
-    if (!fullSync) {
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      query = query.gte('updated_at', oneDayAgo);
+    // Fetch ALL external prices using pagination
+    let allPrices: any[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      let query = externalSupabase
+        .from('price_list')
+        .select('*')
+        .range(from, from + batchSize - 1);
+      
+      if (!fullSync) {
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        query = query.gte('updated_at', oneDayAgo);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+      } else {
+        allPrices = allPrices.concat(data);
+        if (data.length < batchSize) {
+          hasMore = false;
+        } else {
+          from += batchSize;
+        }
+      }
     }
 
-    const { data: externalPrices, error } = await query;
-
-    if (error) throw error;
-
-    stats.fetched = externalPrices?.length || 0;
+    stats.fetched = allPrices.length;
     console.log(`Fetched ${stats.fetched} prices from external database`);
+
+    const externalPrices = allPrices;
 
     // Process each price
     for (const externalPrice of externalPrices || []) {
@@ -393,20 +440,42 @@ async function syncBusinessFacts(
   };
 
   try {
-    // Fetch external facts
-    let query = externalSupabase.from('business_facts').select('*');
-    
-    if (!fullSync) {
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      query = query.gte('updated_at', oneDayAgo);
+    // Fetch ALL external facts using pagination
+    let allFacts: any[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      let query = externalSupabase
+        .from('business_facts')
+        .select('*')
+        .range(from, from + batchSize - 1);
+      
+      if (!fullSync) {
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        query = query.gte('updated_at', oneDayAgo);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+      } else {
+        allFacts = allFacts.concat(data);
+        if (data.length < batchSize) {
+          hasMore = false;
+        } else {
+          from += batchSize;
+        }
+      }
     }
 
-    const { data: externalFacts, error } = await query;
-
-    if (error) throw error;
-
-    stats.fetched = externalFacts?.length || 0;
+    stats.fetched = allFacts.length;
     console.log(`Fetched ${stats.fetched} business facts from external database`);
+
+    const externalFacts = allFacts;
 
     // Process each fact
     for (const externalFact of externalFacts || []) {
@@ -482,20 +551,43 @@ async function syncConversations(
   };
 
   try {
-    // Fetch external conversations
-    let query = externalSupabase.from('conversations').select('*');
-    
-    if (!fullSync) {
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      query = query.gte('created_at', oneDayAgo);
+    // Fetch ALL external conversations using pagination
+    let allConvs: any[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      let query = externalSupabase
+        .from('conversations')
+        .select('*')
+        .range(from, from + batchSize - 1);
+      
+      if (!fullSync) {
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        query = query.gte('created_at', oneDayAgo);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+      } else {
+        allConvs = allConvs.concat(data);
+        console.log(`Fetched batch: ${data.length} conversations (total: ${allConvs.length})`);
+        if (data.length < batchSize) {
+          hasMore = false;
+        } else {
+          from += batchSize;
+        }
+      }
     }
 
-    const { data: externalConvs, error } = await query;
+    stats.fetched = allConvs.length;
+    console.log(`Fetched ${stats.fetched} conversations total from external database`);
 
-    if (error) throw error;
-
-    stats.fetched = externalConvs?.length || 0;
-    console.log(`Fetched ${stats.fetched} conversations from external database`);
+    const externalConvs = allConvs;
 
     // Process each conversation
     for (const externalConv of externalConvs || []) {
