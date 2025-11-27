@@ -568,10 +568,16 @@ async function syncConversations(
         query = query.gte('created_at', oneDayAgo);
       }
 
+      console.log(`Attempting to fetch conversations batch ${from}-${from + batchSize - 1}`);
       const { data, error } = await query;
-      if (error) throw error;
+      
+      if (error) {
+        console.error('Error fetching conversations from external DB:', error);
+        throw error;
+      }
 
       if (!data || data.length === 0) {
+        console.log(`No conversations found in batch ${from}-${from + batchSize - 1}`);
         hasMore = false;
       } else {
         allConvs = allConvs.concat(data);

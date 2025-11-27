@@ -247,11 +247,19 @@ export function DataSyncPanel() {
           </Button>
         </div>
         
-        <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded">
-          <p className="text-sm text-amber-700 dark:text-amber-400">
-            <strong>Note:</strong> Conversations table has 10k+ records. Use "Sync All" button only if needed - 
-            it will take several minutes. The default "Knowledge Base" sync excludes conversations.
-          </p>
+        <div className="mt-4 space-y-2">
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded">
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              <strong>Note:</strong> Conversations table has 10k+ records. Use "Sync All" button only if needed - 
+              it will take several minutes. The default "Knowledge Base" sync excludes conversations.
+            </p>
+          </div>
+          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded">
+            <p className="text-sm text-blue-700 dark:text-blue-400">
+              <strong>Troubleshooting:</strong> If conversations sync returns 0 records, check that the external database 
+              has RLS policies disabled or configured to allow anonymous access on the conversations table.
+            </p>
+          </div>
         </div>
       </Card>
 
