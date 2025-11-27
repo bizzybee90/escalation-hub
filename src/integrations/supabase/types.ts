@@ -468,6 +468,50 @@ export type Database = {
         }
         Relationships: []
       }
+      faqs: {
+        Row: {
+          answer: string
+          category: string
+          created_at: string | null
+          id: string
+          keywords: string[] | null
+          priority: number | null
+          question: string
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          answer: string
+          category: string
+          created_at?: string | null
+          id?: string
+          keywords?: string[] | null
+          priority?: number | null
+          question: string
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          answer?: string
+          category?: string
+          created_at?: string | null
+          id?: string
+          keywords?: string[] | null
+          priority?: number | null
+          question?: string
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faqs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_responses: {
         Row: {
           agent_id: string | null
