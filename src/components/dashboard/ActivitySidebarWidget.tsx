@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Bot, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useWorkspace } from '@/hooks/useWorkspace';
+import { useNavigate } from 'react-router-dom';
 
 interface QuickStats {
   aiHandled: number;
@@ -13,6 +14,7 @@ interface QuickStats {
 
 export const ActivitySidebarWidget = () => {
   const { workspace } = useWorkspace();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<QuickStats>({
     aiHandled: 0,
     escalated: 0,
@@ -86,7 +88,10 @@ export const ActivitySidebarWidget = () => {
           <span className="text-lg font-bold text-green-600">{stats.aiHandled}</span>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div 
+          className="flex items-center justify-between cursor-pointer hover:bg-accent/50 -mx-2 px-2 py-1 rounded transition-colors"
+          onClick={() => navigate('/escalations')}
+        >
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-orange-600" />
             <span className="text-sm">Escalated</span>

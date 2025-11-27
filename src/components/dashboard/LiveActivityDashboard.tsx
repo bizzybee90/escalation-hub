@@ -24,6 +24,14 @@ interface ConversationStats {
   positiveCount: number;
   neutralCount: number;
   negativeCount: number;
+  unread: number;
+  unreadByChannel: {
+    email: number;
+    whatsapp: number;
+    sms: number;
+    phone: number;
+    webchat: number;
+  };
 }
 
 interface RecentConversation {
@@ -51,7 +59,15 @@ export const LiveActivityDashboard = () => {
     avgConfidence: 0,
     positiveCount: 0,
     neutralCount: 0,
-    negativeCount: 0
+    negativeCount: 0,
+    unread: 0,
+    unreadByChannel: {
+      email: 0,
+      whatsapp: 0,
+      sms: 0,
+      phone: 0,
+      webchat: 0
+    }
   });
   const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,6 +110,19 @@ export const LiveActivityDashboard = () => {
         const neutralCount = conversations.filter(c => c.ai_sentiment === 'neutral').length;
         const negativeCount = conversations.filter(c => c.ai_sentiment === 'negative').length;
 
+        // Calculate unread (status='new') conversations
+        const unreadConversations = conversations.filter(c => c.status === 'new');
+        const unread = unreadConversations.length;
+        
+        // Break down unread by channel
+        const unreadByChannel = {
+          email: unreadConversations.filter(c => c.channel === 'email').length,
+          whatsapp: unreadConversations.filter(c => c.channel === 'whatsapp').length,
+          sms: unreadConversations.filter(c => c.channel === 'sms').length,
+          phone: unreadConversations.filter(c => c.channel === 'phone').length,
+          webchat: unreadConversations.filter(c => c.channel === 'webchat').length,
+        };
+
         setStats({
           total,
           aiHandled,
@@ -102,7 +131,9 @@ export const LiveActivityDashboard = () => {
           avgConfidence,
           positiveCount,
           neutralCount,
-          negativeCount
+          negativeCount,
+          unread,
+          unreadByChannel
         });
 
         setRecentConversations(conversations.slice(0, 20) as RecentConversation[]);
@@ -174,6 +205,41 @@ export const LiveActivityDashboard = () => {
         <h1 className="text-3xl font-bold">Live Activity Dashboard</h1>
         <p className="text-muted-foreground">Real-time AI performance metrics for today</p>
       </div>
+
+      {/* Unread Messages */}
+      <Card className="p-6 bg-purple-50 dark:bg-purple-950/20">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">Unread Conversations</p>
+            <h3 className="text-4xl font-bold mt-2 text-purple-600 dark:text-purple-400">
+              {stats.unread}
+            </h3>
+          </div>
+          <MessageSquare className="h-10 w-10 text-purple-600 dark:text-purple-400" />
+        </div>
+        <div className="space-y-2 pt-4 border-t">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">📧 Email</span>
+            <span className="font-semibold">{stats.unreadByChannel.email}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">💬 WhatsApp</span>
+            <span className="font-semibold">{stats.unreadByChannel.whatsapp}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">📱 SMS</span>
+            <span className="font-semibold">{stats.unreadByChannel.sms}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">📞 Phone</span>
+            <span className="font-semibold">{stats.unreadByChannel.phone}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">💻 Web Chat</span>
+            <span className="font-semibold">{stats.unreadByChannel.webchat}</span>
+          </div>
+        </div>
+      </Card>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
