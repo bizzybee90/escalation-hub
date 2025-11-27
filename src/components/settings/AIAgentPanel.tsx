@@ -551,24 +551,31 @@ export const AIAgentPanel = () => {
                               >
                                 <Edit2 className="h-4 w-4" />
                               </Button>
-                              {!prompt.isDefault && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleSetDefault(prompt.id)}
-                                  >
-                                    Set Default
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeletePrompt(prompt.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </>
+                              {!prompt.isDefault ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleSetDefault(prompt.id)}
+                                >
+                                  Set Default
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  disabled
+                                >
+                                  Current Default
+                                </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeletePrompt(prompt.id)}
+                                disabled={prompt.isDefault}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           </div>
                         </CardContent>
