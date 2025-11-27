@@ -24,5 +24,8 @@ verify_jwt = false
 [functions.send-response]
 verify_jwt = false
 
+[functions.receive-email]
+verify_jwt = false
+
 [functions.send-scheduled-summary]
 verify_jwt = false
