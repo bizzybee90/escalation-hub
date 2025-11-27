@@ -2,12 +2,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Sparkles, Bot, Settings as SettingsIcon, Save } from 'lucide-react';
+import { Sparkles, Bot, Settings as SettingsIcon, Save, Plus, Trash2, Edit2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { z } from 'zod';
 
 interface AIModel {
   id: string;
@@ -128,21 +131,36 @@ const claudeModels: AIModel[] = [
   }
 ];
 
+interface SystemPrompt {
+  id: string;
+  name: string;
+  prompt: string;
+  model: string;
+  isDefault: boolean;
+}
+
+const promptSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
+  prompt: z.string().trim().min(10, 'Prompt must be at least 10 characters').max(5000, 'Prompt must be less than 5000 characters'),
+  model: z.string().min(1, 'Model is required')
+});
+
 export const AIAgentPanel = () => {
   const { toast } = useToast();
-  const [systemPrompt, setSystemPrompt] = useState('');
+  const [prompts, setPrompts] = useState<SystemPrompt[]>([]);
+  const [editingPrompt, setEditingPrompt] = useState<SystemPrompt | null>(null);
+  const [promptName, setPromptName] = useState('');
+  const [promptText, setPromptText] = useState('');
+  const [selectedModel, setSelectedModel] = useState('google/gemini-2.5-flash');
   const [isSaving, setIsSaving] = useState(false);
   const [hasAnthropicKey, setHasAnthropicKey] = useState(false);
 
   useEffect(() => {
     const checkAnthropicKey = async () => {
-      // Check if ANTHROPIC_API_KEY secret exists
       try {
         const { data, error } = await supabase.functions.invoke('claude-ai-agent', {
           body: { test: true }
         });
-        
-        // If we get a response without auth error, the key exists
         setHasAnthropicKey(!error || error.message !== 'ANTHROPIC_API_KEY is not set');
       } catch {
         setHasAnthropicKey(false);
@@ -150,34 +168,119 @@ export const AIAgentPanel = () => {
     };
 
     checkAnthropicKey();
-    loadSystemPrompt();
+    loadPrompts();
   }, []);
 
-  const loadSystemPrompt = async () => {
-    // Load saved system prompt from workspace settings (future enhancement)
-    // For now, show a default
-    setSystemPrompt('You are a helpful AI assistant for customer support. Be concise, professional, and friendly.');
+  const loadPrompts = async () => {
+    // Load from localStorage for now
+    const saved = localStorage.getItem('ai-prompts');
+    if (saved) {
+      setPrompts(JSON.parse(saved));
+    } else {
+      // Set default prompt
+      const defaultPrompts: SystemPrompt[] = [{
+        id: '1',
+        name: 'Default Customer Support',
+        prompt: 'You are a helpful AI assistant for customer support. Be concise, professional, and friendly.',
+        model: 'google/gemini-2.5-flash',
+        isDefault: true
+      }];
+      setPrompts(defaultPrompts);
+      localStorage.setItem('ai-prompts', JSON.stringify(defaultPrompts));
+    }
   };
 
-  const saveSystemPrompt = async () => {
-    setIsSaving(true);
+  const handleSavePrompt = async () => {
     try {
-      // Save to workspace settings (future enhancement)
-      // For now, just show success
+      // Validate input
+      const validation = promptSchema.safeParse({
+        name: promptName,
+        prompt: promptText,
+        model: selectedModel
+      });
+
+      if (!validation.success) {
+        toast({
+          title: 'Validation Error',
+          description: validation.error.issues[0].message,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setIsSaving(true);
+
+      if (editingPrompt) {
+        // Update existing prompt
+        const updated = prompts.map(p => 
+          p.id === editingPrompt.id 
+            ? { ...p, name: promptName, prompt: promptText, model: selectedModel }
+            : p
+        );
+        setPrompts(updated);
+        localStorage.setItem('ai-prompts', JSON.stringify(updated));
+        setEditingPrompt(null);
+      } else {
+        // Add new prompt
+        const newPrompt: SystemPrompt = {
+          id: Date.now().toString(),
+          name: promptName,
+          prompt: promptText,
+          model: selectedModel,
+          isDefault: prompts.length === 0
+        };
+        const updated = [...prompts, newPrompt];
+        setPrompts(updated);
+        localStorage.setItem('ai-prompts', JSON.stringify(updated));
+      }
+
+      setPromptName('');
+      setPromptText('');
+      setSelectedModel('google/gemini-2.5-flash');
       
       toast({
-        title: 'System Prompt Updated',
+        title: editingPrompt ? 'Prompt Updated' : 'Prompt Created',
         description: 'Your AI agent configuration has been saved.'
       });
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to save system prompt',
+        description: 'Failed to save prompt',
         variant: 'destructive'
       });
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleEditPrompt = (prompt: SystemPrompt) => {
+    setEditingPrompt(prompt);
+    setPromptName(prompt.name);
+    setPromptText(prompt.prompt);
+    setSelectedModel(prompt.model);
+  };
+
+  const handleDeletePrompt = (id: string) => {
+    const updated = prompts.filter(p => p.id !== id);
+    setPrompts(updated);
+    localStorage.setItem('ai-prompts', JSON.stringify(updated));
+    toast({
+      title: 'Prompt Deleted',
+      description: 'The prompt has been removed.'
+    });
+  };
+
+  const handleSetDefault = (id: string) => {
+    const updated = prompts.map(p => ({
+      ...p,
+      isDefault: p.id === id
+    }));
+    setPrompts(updated);
+    localStorage.setItem('ai-prompts', JSON.stringify(updated));
+    toast({
+      title: 'Default Prompt Set',
+      description: 'This prompt is now the default.'
+    });
   };
 
   const getProviderBadge = (provider: AIModel['provider']) => {
@@ -326,28 +429,153 @@ export const AIAgentPanel = () => {
             </TabsContent>
 
             <TabsContent value="prompts" className="space-y-4">
+              {/* Create/Edit Prompt Form */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Default System Prompt</CardTitle>
+                  <CardTitle className="text-base">
+                    {editingPrompt ? 'Edit Prompt' : 'Create New Prompt'}
+                  </CardTitle>
                   <CardDescription>
-                    Configure the default behavior for your AI agents across all channels
+                    Create custom system prompts for different use cases with specific AI models
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
+                    <Label htmlFor="prompt-name">Prompt Name</Label>
+                    <Input
+                      id="prompt-name"
+                      value={promptName}
+                      onChange={(e) => setPromptName(e.target.value)}
+                      placeholder="e.g., Customer Support, Sales Enquiries"
+                      maxLength={100}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="model-select">AI Model</Label>
+                    <Select value={selectedModel} onValueChange={setSelectedModel}>
+                      <SelectTrigger id="model-select">
+                        <SelectValue placeholder="Select a model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="google/gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</SelectItem>
+                        <SelectItem value="google/gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
+                        <SelectItem value="google/gemini-3-pro-preview">Gemini 3 Pro Preview</SelectItem>
+                        <SelectItem value="google/gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</SelectItem>
+                        <SelectItem value="openai/gpt-5">GPT-5</SelectItem>
+                        <SelectItem value="openai/gpt-5-mini">GPT-5 Mini</SelectItem>
+                        <SelectItem value="openai/gpt-5-nano">GPT-5 Nano</SelectItem>
+                        {hasAnthropicKey && (
+                          <>
+                            <SelectItem value="claude-sonnet-4-5">Claude Sonnet 4.5</SelectItem>
+                            <SelectItem value="claude-opus-4-1-20250805">Claude Opus 4.1</SelectItem>
+                            <SelectItem value="claude-sonnet-4-20250514">Claude Sonnet 4</SelectItem>
+                            <SelectItem value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="system-prompt">System Prompt</Label>
                     <Textarea
                       id="system-prompt"
-                      value={systemPrompt}
-                      onChange={(e) => setSystemPrompt(e.target.value)}
+                      value={promptText}
+                      onChange={(e) => setPromptText(e.target.value)}
                       placeholder="Enter your system prompt here..."
                       className="min-h-[200px] font-mono text-sm"
+                      maxLength={5000}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      {promptText.length}/5000 characters
+                    </p>
                   </div>
-                  <Button onClick={saveSystemPrompt} disabled={isSaving}>
-                    <Save className="h-4 w-4 mr-2" />
-                    {isSaving ? 'Saving...' : 'Save System Prompt'}
-                  </Button>
+
+                  <div className="flex gap-2">
+                    <Button onClick={handleSavePrompt} disabled={isSaving || !promptName || !promptText}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isSaving ? 'Saving...' : editingPrompt ? 'Update Prompt' : 'Create Prompt'}
+                    </Button>
+                    {editingPrompt && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => {
+                          setEditingPrompt(null);
+                          setPromptName('');
+                          setPromptText('');
+                          setSelectedModel('google/gemini-2.5-flash');
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Saved Prompts List */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Saved Prompts</CardTitle>
+                  <CardDescription>
+                    Manage your custom AI prompts
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {prompts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No prompts created yet.</p>
+                  ) : (
+                    prompts.map((prompt) => (
+                      <Card key={prompt.id} className="border-border/50">
+                        <CardContent className="pt-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-medium">{prompt.name}</h4>
+                                {prompt.isDefault && (
+                                  <Badge variant="default" className="text-xs">Default</Badge>
+                                )}
+                                <Badge variant="secondary" className="text-xs">
+                                  {prompt.model}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground line-clamp-2">
+                                {prompt.prompt}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditPrompt(prompt)}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              {!prompt.isDefault && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleSetDefault(prompt.id)}
+                                  >
+                                    Set Default
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeletePrompt(prompt.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
                 </CardContent>
               </Card>
 
