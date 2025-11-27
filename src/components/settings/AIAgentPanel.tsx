@@ -141,7 +141,7 @@ interface SystemPrompt {
 
 const promptSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
-  prompt: z.string().trim().min(10, 'Prompt must be at least 10 characters').max(5000, 'Prompt must be less than 5000 characters'),
+  prompt: z.string().trim().min(10, 'Prompt must be at least 10 characters'),
   model: z.string().min(1, 'Model is required')
 });
 
@@ -485,10 +485,9 @@ export const AIAgentPanel = () => {
                       onChange={(e) => setPromptText(e.target.value)}
                       placeholder="Enter your system prompt here..."
                       className="min-h-[200px] font-mono text-sm"
-                      maxLength={5000}
                     />
                     <p className="text-xs text-muted-foreground">
-                      {promptText.length}/5000 characters
+                      {promptText.length} characters
                     </p>
                   </div>
 
