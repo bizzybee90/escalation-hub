@@ -21,19 +21,21 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-11">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="interface">Interface</TabsTrigger>
-          <TabsTrigger value="ordering">Ordering</TabsTrigger>
-          <TabsTrigger value="ai-agent">AI Agent</TabsTrigger>
-          <TabsTrigger value="channels">Channels</TabsTrigger>
-          <TabsTrigger value="gdpr">GDPR</TabsTrigger>
-          <TabsTrigger value="cleanup">Cleanup</TabsTrigger>
-          <TabsTrigger value="export">Data Export</TabsTrigger>
-          <TabsTrigger value="deletion">Data Deletion</TabsTrigger>
-          <TabsTrigger value="retention">Retention Policy</TabsTrigger>
-          <TabsTrigger value="audit">Audit Logs</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-2">
+          <TabsList className="inline-flex w-auto min-w-full">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="interface">Interface</TabsTrigger>
+            <TabsTrigger value="ordering">Ordering</TabsTrigger>
+            <TabsTrigger value="ai-agent">AI Agent</TabsTrigger>
+            <TabsTrigger value="channels">Channels</TabsTrigger>
+            <TabsTrigger value="gdpr">GDPR</TabsTrigger>
+            <TabsTrigger value="cleanup">Cleanup</TabsTrigger>
+            <TabsTrigger value="export">Data Export</TabsTrigger>
+            <TabsTrigger value="deletion">Data Deletion</TabsTrigger>
+            <TabsTrigger value="retention">Retention</TabsTrigger>
+            <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="dashboard" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
