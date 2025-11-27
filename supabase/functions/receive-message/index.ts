@@ -1,10 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.1';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+interface NormalisedMessage {
+  channel: "sms" | "whatsapp" | "email" | "web";
+  customer_identifier: string;
+  customer_name: string | null;
+  customer_email: string | null;
+  message_content: string;
+  message_id: string;
+  timestamp: string;
+  session_id: string;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,344 +23,281 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing required environment variables');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const contentType = req.headers.get('content-type') || '';
-    let body: any;
+    let rawBody: any;
 
-    // Parse request based on content type
+    // Parse incoming request based on content type
     if (contentType.includes('application/x-www-form-urlencoded')) {
       // Twilio webhook format
       const formData = await req.formData();
-      body = Object.fromEntries(formData);
+      rawBody = Object.fromEntries(formData);
     } else {
-      // JSON format (for testing or other channels)
-      body = await req.json();
+      // JSON format (for testing or web chat)
+      rawBody = await req.json();
     }
 
-    console.log('Received webhook:', {
-      contentType,
-      bodyKeys: Object.keys(body),
-      from: body.From || body.from
-    });
+    console.log('Received webhook:', rawBody);
 
-    // Normalize the incoming message to a standard format
-    let normalizedMessage;
-    
-    // Detect channel and normalize
-    if (body.MessagingServiceSid || body.From?.startsWith('whatsapp:')) {
-      // Twilio WhatsApp
-      normalizedMessage = {
-        channel: 'whatsapp',
-        customerIdentifier: body.From.replace('whatsapp:', ''),
-        customerName: body.ProfileName || null,
-        messageContent: body.Body,
-        messageId: body.MessageSid,
-        timestamp: new Date().toISOString(),
-        metadata: {
-          twilioSid: body.MessageSid,
-          accountSid: body.AccountSid,
-          numMedia: body.NumMedia || '0'
-        }
-      };
-    } else if (body.From && !body.From.startsWith('whatsapp:')) {
-      // Twilio SMS
-      normalizedMessage = {
-        channel: 'sms',
-        customerIdentifier: body.From,
-        customerName: null,
-        messageContent: body.Body,
-        messageId: body.MessageSid,
-        timestamp: new Date().toISOString(),
-        metadata: {
-          twilioSid: body.MessageSid,
-          accountSid: body.AccountSid,
-          numMedia: body.NumMedia || '0'
-        }
-      };
-    } else if (body.channel) {
-      // Already normalized format (for testing)
-      normalizedMessage = body;
-    } else {
-      throw new Error('Unable to determine message channel');
-    }
+    // Step 1: Normalise incoming message
+    const normalised = normaliseMessage(rawBody);
+    console.log('Normalised message:', normalised);
 
-    console.log('Normalized message:', {
-      channel: normalizedMessage.channel,
-      customer: normalizedMessage.customerIdentifier,
-      messagePreview: normalizedMessage.messageContent.substring(0, 50)
-    });
-
-    // Get or create customer
+    // Step 2: Find or create customer
     const { data: existingCustomer } = await supabase
       .from('customers')
-      .select('id, workspace_id')
-      .eq('phone', normalizedMessage.customerIdentifier)
+      .select('*')
+      .or(`phone.eq.${normalised.customer_identifier},email.eq.${normalised.customer_identifier}`)
       .maybeSingle();
 
     let customerId: string;
-    let workspaceId: string;
 
     if (existingCustomer) {
       customerId = existingCustomer.id;
-      workspaceId = existingCustomer.workspace_id;
       console.log('Found existing customer:', customerId);
     } else {
-      // Get first workspace (in multi-tenant, you'd determine this from routing)
+      // Get first workspace
       const { data: workspace } = await supabase
         .from('workspaces')
         .select('id')
         .limit(1)
         .single();
 
-      if (!workspace) {
-        throw new Error('No workspace found');
-      }
-
-      workspaceId = workspace.id;
+      if (!workspace) throw new Error('No workspace found');
 
       // Create new customer
       const { data: newCustomer, error: customerError } = await supabase
         .from('customers')
         .insert({
-          workspace_id: workspaceId,
-          phone: normalizedMessage.customerIdentifier,
-          name: normalizedMessage.customerName || `Customer ${normalizedMessage.customerIdentifier}`,
-          preferred_channel: normalizedMessage.channel
+          workspace_id: workspace.id,
+          name: normalised.customer_name || 'Unknown',
+          phone: normalised.channel === 'sms' || normalised.channel === 'whatsapp' 
+            ? normalised.customer_identifier 
+            : null,
+          email: normalised.channel === 'email' 
+            ? normalised.customer_identifier 
+            : normalised.customer_email,
+          preferred_channel: normalised.channel,
         })
         .select()
         .single();
 
-      if (customerError) {
-        console.error('Error creating customer:', customerError);
-        throw customerError;
-      }
-
+      if (customerError) throw customerError;
       customerId = newCustomer.id;
       console.log('Created new customer:', customerId);
     }
 
-    // Find or create conversation
+    // Step 3: Find or create conversation
     const { data: existingConversation } = await supabase
       .from('conversations')
-      .select('id, status')
+      .select('*')
       .eq('customer_id', customerId)
-      .eq('channel', normalizedMessage.channel)
-      .in('status', ['new', 'in_progress', 'waiting'])
+      .eq('channel', normalised.channel)
+      .neq('status', 'resolved')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     let conversationId: string;
-    let isNewConversation = false;
 
     if (existingConversation) {
       conversationId = existingConversation.id;
-      console.log('Using existing conversation:', conversationId);
+      console.log('Found existing conversation:', conversationId);
       
       // Update conversation
       await supabase
         .from('conversations')
         .update({
+          message_count: (existingConversation.message_count || 0) + 1,
           updated_at: new Date().toISOString(),
-          message_count: supabase.rpc('increment_message_count', { conversation_id: conversationId })
         })
         .eq('id', conversationId);
     } else {
+      // Get workspace id from customer
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('workspace_id')
+        .eq('id', customerId)
+        .single();
+
       // Create new conversation
       const { data: newConversation, error: convError } = await supabase
         .from('conversations')
         .insert({
-          workspace_id: workspaceId,
+          workspace_id: customer.workspace_id,
           customer_id: customerId,
-          channel: normalizedMessage.channel,
+          channel: normalised.channel,
+          external_conversation_id: normalised.session_id,
           status: 'new',
-          conversation_type: 'ai_handled',
           message_count: 1,
-          title: `${normalizedMessage.channel} conversation with ${normalizedMessage.customerName || normalizedMessage.customerIdentifier}`
+          title: normalised.message_content.substring(0, 50),
         })
         .select()
         .single();
 
-      if (convError) {
-        console.error('Error creating conversation:', convError);
-        throw convError;
-      }
-
+      if (convError) throw convError;
       conversationId = newConversation.id;
-      isNewConversation = true;
       console.log('Created new conversation:', conversationId);
     }
 
-    // Insert the customer message
+    // Step 4: Log incoming message
     const { error: messageError } = await supabase
       .from('messages')
       .insert({
         conversation_id: conversationId,
-        direction: 'inbound',
-        channel: normalizedMessage.channel,
         actor_type: 'customer',
-        actor_id: customerId,
-        actor_name: normalizedMessage.customerName || normalizedMessage.customerIdentifier,
-        body: normalizedMessage.messageContent,
-        raw_payload: normalizedMessage.metadata
+        actor_name: normalised.customer_name || 'Customer',
+        body: normalised.message_content,
+        channel: normalised.channel,
+        direction: 'inbound',
+        raw_payload: rawBody,
       });
 
-    if (messageError) {
-      console.error('Error inserting message:', messageError);
-      throw messageError;
-    }
+    if (messageError) throw messageError;
 
-    // Get conversation history for context
-    const { data: messages } = await supabase
+    // Step 5: Get conversation history for context
+    const { data: history } = await supabase
       .from('messages')
-      .select('actor_type, body, created_at')
+      .select('*')
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(10);
 
-    const conversationHistory = messages?.map(msg => ({
-      role: msg.actor_type === 'customer' ? 'user' : 'assistant',
-      content: msg.body,
-      timestamp: msg.created_at
-    })) || [];
-
-    // Call Claude AI Agent
-    console.log('Calling claude-ai-agent...');
-    const { data: aiResponse, error: aiError } = await supabase.functions.invoke('claude-ai-agent', {
+    // Step 6: Call AI agent
+    const aiResponse = await supabase.functions.invoke('claude-ai-agent', {
       body: {
-        channel: normalizedMessage.channel,
-        customerIdentifier: normalizedMessage.customerIdentifier,
-        customerName: normalizedMessage.customerName,
-        messageContent: normalizedMessage.messageContent,
-        conversationHistory,
-        metadata: normalizedMessage.metadata
+        message: normalised,
+        conversation_history: history || [],
+        customer_data: existingCustomer,
       }
     });
 
-    if (aiError) {
-      console.error('AI agent error:', aiError);
-      throw aiError;
+    if (aiResponse.error) {
+      console.error('AI agent error:', aiResponse.error);
+      throw new Error('AI agent failed');
     }
 
-    console.log('AI Decision:', {
-      shouldEscalate: aiResponse.shouldEscalate,
-      confidence: aiResponse.confidence,
-      intent: aiResponse.intent
-    });
+    const aiOutput = aiResponse.data;
+    console.log('AI response:', aiOutput);
 
-    // Handle based on AI decision
-    if (aiResponse.shouldEscalate) {
-      // ESCALATE TO HUMAN
-      console.log('Escalating to human:', aiResponse.escalationReason);
+    // Step 7: Log AI response message
+    await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversationId,
+        actor_type: 'ai',
+        actor_name: 'BizzyBee AI',
+        body: aiOutput.response,
+        channel: normalised.channel,
+        direction: 'outbound',
+      });
+
+    // Step 8: Update conversation with AI metadata
+    const updateData: any = {
+      ai_confidence: aiOutput.confidence,
+      ai_sentiment: aiOutput.sentiment,
+      category: aiOutput.ai_category,
+      title: aiOutput.ai_title,
+      summary_for_human: aiOutput.ai_summary,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (aiOutput.escalate) {
+      updateData.is_escalated = true;
+      updateData.escalated_at = new Date().toISOString();
+      updateData.ai_reason_for_escalation = aiOutput.escalation_reason;
+      updateData.status = 'escalated';
+      updateData.conversation_type = 'escalated';
       
-      await supabase
-        .from('conversations')
-        .update({
-          is_escalated: true,
-          escalated_at: new Date().toISOString(),
-          status: 'new',
-          conversation_type: 'escalated',
-          ai_reason_for_escalation: aiResponse.escalationReason,
-          ai_confidence: aiResponse.confidence,
-          ai_sentiment: aiResponse.sentiment,
-          category: aiResponse.category,
-          summary_for_human: `Customer inquiry: ${normalizedMessage.messageContent.substring(0, 100)}...`
-        })
-        .eq('id', conversationId);
-
-      // Insert escalation message to messages table
-      await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          direction: 'internal',
-          channel: normalizedMessage.channel,
-          actor_type: 'system',
-          actor_name: 'AI Agent',
-          body: `⚠️ Escalated: ${aiResponse.escalationReason}\nConfidence: ${aiResponse.confidence}%\nSentiment: ${aiResponse.sentiment}`,
-          is_internal: true
-        });
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          action: 'escalated',
-          conversationId,
-          reason: aiResponse.escalationReason
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
+      console.log('Escalating conversation:', conversationId);
     } else {
-      // AUTO-RESPOND
-      console.log('Auto-responding with confidence:', aiResponse.confidence);
+      updateData.ai_message_count = (existingConversation?.ai_message_count || 0) + 1;
+      updateData.conversation_type = 'ai_handled';
+      updateData.status = 'ai_handling';
+    }
 
-      // Update conversation metadata
-      await supabase
-        .from('conversations')
-        .update({
-          ai_message_count: supabase.rpc('increment_ai_message_count', { conversation_id: conversationId }),
-          ai_confidence: aiResponse.confidence,
-          ai_sentiment: aiResponse.sentiment,
-          category: aiResponse.category,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', conversationId);
+    await supabase
+      .from('conversations')
+      .update(updateData)
+      .eq('id', conversationId);
 
-      // Send the response
-      const { error: sendError } = await supabase.functions.invoke('send-response', {
+    // Step 9: Send response if not escalated
+    if (!aiOutput.escalate) {
+      console.log('Sending automated response');
+      
+      const sendResponse = await supabase.functions.invoke('send-response', {
         body: {
-          conversationId,
-          channel: normalizedMessage.channel,
-          to: normalizedMessage.customerIdentifier,
-          message: aiResponse.responseText,
-          metadata: {
-            aiIntent: aiResponse.intent,
-            aiConfidence: aiResponse.confidence
-          }
+          conversation_id: conversationId,
+          channel: normalised.channel,
+          recipient: normalised.customer_identifier,
+          message: aiOutput.response,
         }
       });
 
-      if (sendError) {
-        console.error('Error sending response:', sendError);
-        throw sendError;
+      if (sendResponse.error) {
+        console.error('Send response error:', sendResponse.error);
       }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          action: 'auto_responded',
-          conversationId,
-          confidence: aiResponse.confidence,
-          response: aiResponse.responseText
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
+    } else {
+      console.log('Conversation escalated - not sending automated response');
     }
+
+    return new Response(JSON.stringify({
+      success: true,
+      conversation_id: conversationId,
+      escalated: aiOutput.escalate,
+      response: aiOutput.response,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error: any) {
     console.error('Error in receive-message:', error);
-    return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        details: error.toString()
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return new Response(JSON.stringify({
+      error: error.message,
+      success: false
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
+
+function normaliseMessage(rawBody: any): NormalisedMessage {
+  // Detect channel from Twilio
+  if (rawBody.From && rawBody.Body) {
+    const from = rawBody.From;
+    const isWhatsApp = from.startsWith('whatsapp:');
+    
+    const customerIdentifier = isWhatsApp 
+      ? from.replace('whatsapp:', '')
+      : from;
+
+    const businessNumber = rawBody.To?.replace('whatsapp:', '') || '+447878758588';
+    
+    return {
+      channel: isWhatsApp ? 'whatsapp' : 'sms',
+      customer_identifier: customerIdentifier,
+      customer_name: null,
+      customer_email: null,
+      message_content: rawBody.Body,
+      message_id: rawBody.MessageSid || `msg_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      session_id: `${isWhatsApp ? 'whatsapp' : 'sms'}:${customerIdentifier}->${businessNumber}`,
+    };
+  }
+
+  // JSON format (for testing or web chat)
+  return {
+    channel: rawBody.channel || 'web',
+    customer_identifier: rawBody.customer_identifier || rawBody.from || 'unknown',
+    customer_name: rawBody.customer_name || null,
+    customer_email: rawBody.customer_email || null,
+    message_content: rawBody.message || rawBody.message_content || rawBody.Body || '',
+    message_id: rawBody.message_id || `msg_${Date.now()}`,
+    timestamp: rawBody.timestamp || new Date().toISOString(),
+    session_id: rawBody.session_id || `${rawBody.channel}:${rawBody.customer_identifier}`,
+  };
+}
