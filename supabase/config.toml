@@ -14,3 +14,12 @@ verify_jwt = true
 
 [functions.ai-comparison-test]
 verify_jwt = true
+
+[functions.claude-ai-agent]
+verify_jwt = false
+
+[functions.receive-message]
+verify_jwt = false
+
+[functions.send-response]
+verify_jwt = false
