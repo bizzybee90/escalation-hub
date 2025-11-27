@@ -528,25 +528,21 @@ export const AIAgentPanel = () => {
                     prompts.map((prompt) => (
                       <Card key={prompt.id} className="border-border/50">
                         <CardContent className="pt-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="font-medium">{prompt.name}</h4>
-                                {prompt.isDefault && (
-                                  <Badge variant="default" className="text-xs">Default</Badge>
-                                )}
-                                <Badge variant="secondary" className="text-xs">
-                                  {prompt.model}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-muted-foreground line-clamp-2">
-                                {prompt.prompt}
-                              </p>
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <h4 className="font-medium truncate">{prompt.name}</h4>
+                              {prompt.isDefault && (
+                                <Badge variant="default" className="text-xs shrink-0">Default</Badge>
+                              )}
+                              <Badge variant="secondary" className="text-xs shrink-0">
+                                {prompt.model}
+                              </Badge>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 shrink-0">
                               <Button
                                 variant="ghost"
-                                size="sm"
+                                size="icon"
+                                className="h-8 w-8"
                                 onClick={() => handleEditPrompt(prompt)}
                               >
                                 <Edit2 className="h-4 w-4" />
@@ -570,7 +566,8 @@ export const AIAgentPanel = () => {
                               )}
                               <Button
                                 variant="ghost"
-                                size="sm"
+                                size="icon"
+                                className="h-8 w-8"
                                 onClick={() => handleDeletePrompt(prompt.id)}
                                 disabled={prompt.isDefault}
                               >
@@ -578,6 +575,9 @@ export const AIAgentPanel = () => {
                               </Button>
                             </div>
                           </div>
+                          <p className="text-sm text-muted-foreground mt-3 line-clamp-2">
+                            {prompt.prompt}
+                          </p>
                         </CardContent>
                       </Card>
                     ))
