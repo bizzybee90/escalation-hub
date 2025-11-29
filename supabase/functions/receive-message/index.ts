@@ -216,7 +216,7 @@ serve(async (req) => {
       updateData.is_escalated = true;
       updateData.escalated_at = new Date().toISOString();
       updateData.ai_reason_for_escalation = aiOutput.escalation_reason;
-      updateData.status = 'escalated';
+      updateData.status = 'new'; // Set to 'new' so it appears in conversation lists
       updateData.conversation_type = 'escalated';
       updateData.auto_responded = false;
       
