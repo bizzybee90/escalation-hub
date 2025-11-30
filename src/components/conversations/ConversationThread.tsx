@@ -215,12 +215,14 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
     );
   }
 
-  // Desktop layout
+  // Desktop layout - uses mobile scroll pattern
   return (
-    <div className="flex flex-col h-full overflow-visible">
-      <ConversationHeader conversation={conversation} onUpdate={onUpdate} onBack={onBack} />
+    <div className="flex flex-col h-full">
+      <div className="sticky top-0 z-10 bg-background border-b border-border">
+        <ConversationHeader conversation={conversation} onUpdate={onUpdate} onBack={onBack} />
+      </div>
       
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <AIContextPanel 
           conversation={conversation} 
           onUpdate={onUpdate}
