@@ -55,7 +55,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           minSize={40}
           maxSize={70}
           collapsible={false}
-          className="w-full min-h-0 flex flex-col"
+          className="w-full min-h-0 flex flex-col h-full"
         >
           <div className="flex-1 flex flex-col relative border-r border-border/30 md:border-r w-full overflow-hidden min-h-0">
             {selectedConversation ? (
