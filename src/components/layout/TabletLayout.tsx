@@ -1,62 +1,70 @@
 /**
  * TabletLayout - Two-state layout for tablet devices (760-1199px)
- * 
+ *
  * STATE 1 (List View):
  * - Collapsed sidebar (72px) + Full-width ticket list
  * - Shows when: selectedConversation === null
- * 
+ *
  * STATE 2 (Conversation View):
  * - Collapsed sidebar (72px) + Full-width conversation workspace
  * - Shows when: selectedConversation !== null
- * 
+ *
  * CRITICAL: Do not add third column. Customer Info/Actions use slide-over drawer.
- * 
+ *
  * @breakpoints 760px - 1199px
  * @states list | conversation
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { Sidebar } from '@/components/sidebar/Sidebar';
-import { ConversationList } from '@/components/conversations/ConversationList';
-import { ConversationThread } from '@/components/conversations/ConversationThread';
-import { ConversationThreadSkeleton } from '@/components/conversations/ConversationThreadSkeleton';
-import { BackToListFAB } from '@/components/conversations/BackToListFAB';
-import { Conversation } from '@/lib/types';
-import { User, Zap, ChevronLeft, Inbox } from 'lucide-react';
-import { SLABadge } from '@/components/sla/SLABadge';
-import { Badge } from '@/components/ui/badge';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle2, Clock, UserPlus, AlertCircle, Mail, Phone, Tag } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { formatDistanceToNow } from 'date-fns';
-import { SnoozeDialog } from '@/components/conversations/SnoozeDialog';
-import { useHaptics } from '@/hooks/useHaptics';
-import { useTabletLayoutValidator } from '@/hooks/useTabletLayoutValidator';
-import { TABLET_LAYOUT_RULES } from '@/lib/constants/breakpoints';
+import { useState, useEffect, useRef } from "react";
+import { Sidebar } from "@/components/sidebar/Sidebar";
+import { ConversationList } from "@/components/conversations/ConversationList";
+import { ConversationThread } from "@/components/conversations/ConversationThread";
+import { ConversationThreadSkeleton } from "@/components/conversations/ConversationThreadSkeleton";
+import { BackToListFAB } from "@/components/conversations/BackToListFAB";
+import { Conversation } from "@/lib/types";
+import { User, Zap, ChevronLeft, Inbox } from "lucide-react";
+import { SLABadge } from "@/components/sla/SLABadge";
+import { Badge } from "@/components/ui/badge";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CheckCircle2, Clock, UserPlus, AlertCircle, Mail, Phone, Tag } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
+import { SnoozeDialog } from "@/components/conversations/SnoozeDialog";
+import { useHaptics } from "@/hooks/useHaptics";
+import { useTabletLayoutValidator } from "@/hooks/useTabletLayoutValidator";
+import { TABLET_LAYOUT_RULES } from "@/lib/constants/breakpoints";
 
 interface TabletLayoutProps {
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers';
+  filter?:
+    | "my-tickets"
+    | "unassigned"
+    | "sla-risk"
+    | "all-open"
+    | "completed"
+    | "sent"
+    | "high-priority"
+    | "vip-customers";
 }
 
-export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
+export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [drawerMode, setDrawerMode] = useState<'customer' | 'actions' | null>(null);
+  const [drawerMode, setDrawerMode] = useState<"customer" | "actions" | null>(null);
   const [snoozeDialogOpen, setSnoozeDialogOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const conversationRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { trigger } = useHaptics();
-  
+
   // Layout validation (dev mode only)
   useTabletLayoutValidator();
 
   const handleUpdate = () => {
-    setRefreshKey(prev => prev + 1);
+    setRefreshKey((prev) => prev + 1);
   };
 
   const handleSelectConversation = (conv: Conversation) => {
@@ -64,7 +72,7 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
     setSelectedConversation(conv);
     setDrawerMode(null);
     setIsScrolled(false);
-    trigger('medium');
+    trigger("medium");
     setTimeout(() => setIsLoadingConversation(false), 300);
   };
 
@@ -72,7 +80,7 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
     setSelectedConversation(null);
     setDrawerMode(null);
     setIsScrolled(false);
-    trigger('light');
+    trigger("light");
   };
 
   // Scroll detection for FAB
@@ -86,42 +94,52 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
     const ref = conversationRef.current;
     if (ref) {
-      ref.addEventListener('scroll', handleScroll);
-      return () => ref.removeEventListener('scroll', handleScroll);
+      ref.addEventListener("scroll", handleScroll);
+      return () => ref.removeEventListener("scroll", handleScroll);
     }
   }, [selectedConversation]);
 
   const getFilterTitle = () => {
     switch (filter) {
-      case 'my-tickets': return 'My Tickets';
-      case 'unassigned': return 'Unassigned';
-      case 'sla-risk': return 'SLA Risk';
-      case 'all-open': return 'All Open';
-      case 'completed': return 'Completed';
-      case 'high-priority': return 'High Priority';
-      case 'vip-customers': return 'VIP Customers';
-      default: return 'Conversations';
+      case "my-tickets":
+        return "My Tickets";
+      case "unassigned":
+        return "Unassigned";
+      case "sla-risk":
+        return "SLA Risk";
+      case "all-open":
+        return "All Open";
+      case "completed":
+        return "Completed";
+      case "high-priority":
+        return "High Priority";
+      case "vip-customers":
+        return "VIP Customers";
+      default:
+        return "Conversations";
     }
   };
 
   // Optimistic UI: Resolve
   const handleResolve = async () => {
     if (!selectedConversation) return;
-    
+
     const oldStatus = selectedConversation.status;
-    setSelectedConversation(prev => prev ? { ...prev, status: 'resolved', resolved_at: new Date().toISOString() } : null);
+    setSelectedConversation((prev) =>
+      prev ? { ...prev, status: "resolved", resolved_at: new Date().toISOString() } : null,
+    );
     toast({ title: "Conversation resolved" });
-    trigger('success');
-    
+    trigger("success");
+
     const { error } = await supabase
-      .from('conversations')
-      .update({ status: 'resolved', resolved_at: new Date().toISOString() })
-      .eq('id', selectedConversation.id);
-    
+      .from("conversations")
+      .update({ status: "resolved", resolved_at: new Date().toISOString() })
+      .eq("id", selectedConversation.id);
+
     if (error) {
-      setSelectedConversation(prev => prev ? { ...prev, status: oldStatus, resolved_at: null } : null);
+      setSelectedConversation((prev) => (prev ? { ...prev, status: oldStatus, resolved_at: null } : null));
       toast({ title: "Failed to resolve", description: error.message, variant: "destructive" });
-      trigger('warning');
+      trigger("warning");
     } else {
       handleUpdate();
     }
@@ -130,23 +148,25 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
   // Optimistic UI: Assign to me
   const handleAssignToMe = async () => {
     if (!selectedConversation) return;
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     const oldAssignedTo = selectedConversation.assigned_to;
-    setSelectedConversation(prev => prev ? { ...prev, assigned_to: user.id } : null);
+    setSelectedConversation((prev) => (prev ? { ...prev, assigned_to: user.id } : null));
     toast({ title: "Assigned to you" });
-    trigger('success');
+    trigger("success");
 
     const { error } = await supabase
-      .from('conversations')
+      .from("conversations")
       .update({ assigned_to: user.id })
-      .eq('id', selectedConversation.id);
-    
+      .eq("id", selectedConversation.id);
+
     if (error) {
-      setSelectedConversation(prev => prev ? { ...prev, assigned_to: oldAssignedTo } : null);
+      setSelectedConversation((prev) => (prev ? { ...prev, assigned_to: oldAssignedTo } : null));
       toast({ title: "Assignment failed", description: error.message, variant: "destructive" });
-      trigger('warning');
+      trigger("warning");
     } else {
       handleUpdate();
     }
@@ -155,21 +175,18 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
   // Optimistic UI: Priority change
   const handlePriorityChange = async (priority: string) => {
     if (!selectedConversation) return;
-    
+
     const oldPriority = selectedConversation.priority;
-    setSelectedConversation(prev => prev ? { ...prev, priority: priority as any } : null);
+    setSelectedConversation((prev) => (prev ? { ...prev, priority: priority as any } : null));
     toast({ title: `Priority changed to ${priority}` });
-    trigger('success');
-    
-    const { error } = await supabase
-      .from('conversations')
-      .update({ priority })
-      .eq('id', selectedConversation.id);
-    
+    trigger("success");
+
+    const { error } = await supabase.from("conversations").update({ priority }).eq("id", selectedConversation.id);
+
     if (error) {
-      setSelectedConversation(prev => prev ? { ...prev, priority: oldPriority } : null);
+      setSelectedConversation((prev) => (prev ? { ...prev, priority: oldPriority } : null));
       toast({ title: "Priority change failed", description: error.message, variant: "destructive" });
-      trigger('warning');
+      trigger("warning");
     } else {
       handleUpdate();
     }
@@ -220,20 +237,21 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-2xl font-bold leading-tight mb-1">
-                    {selectedConversation.title}
-                  </h1>
+                  <h1 className="text-2xl font-bold leading-tight mb-1">{selectedConversation.title}</h1>
                   <p className="text-sm text-muted-foreground">
-                    {selectedConversation.channel} • Created {formatDistanceToNow(new Date(selectedConversation.created_at || ''), { addSuffix: true })}
+                    {selectedConversation.channel} • Created{" "}
+                    {formatDistanceToNow(new Date(selectedConversation.created_at || ""), { addSuffix: true })}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {selectedConversation.sla_due_at && (
-                    <SLABadge conversation={selectedConversation} />
-                  )}
+                  {selectedConversation.sla_due_at && <SLABadge conversation={selectedConversation} />}
                   {selectedConversation.priority && (
                     <Badge variant={`priority-${selectedConversation.priority}` as any} className="text-sm px-3 py-1">
-                      {selectedConversation.priority === 'high' ? '🔴' : selectedConversation.priority === 'medium' ? '🟡' : '🟢'}
+                      {selectedConversation.priority === "high"
+                        ? "🔴"
+                        : selectedConversation.priority === "medium"
+                          ? "🟡"
+                          : "🟢"}
                       {selectedConversation.priority}
                     </Badge>
                   )}
@@ -246,10 +264,10 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
               <div className="flex gap-3">
                 <Button
                   onClick={() => {
-                    setDrawerMode(drawerMode === 'customer' ? null : 'customer');
-                    if (drawerMode !== 'customer') trigger('medium');
+                    setDrawerMode(drawerMode === "customer" ? null : "customer");
+                    if (drawerMode !== "customer") trigger("medium");
                   }}
-                  variant={drawerMode === 'customer' ? 'default' : 'outline'}
+                  variant={drawerMode === "customer" ? "default" : "outline"}
                   className="rounded-full px-5 py-2.5 h-auto font-semibold transition-all"
                 >
                   <User className="h-4 w-4 mr-2" />
@@ -257,10 +275,10 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
                 </Button>
                 <Button
                   onClick={() => {
-                    setDrawerMode(drawerMode === 'actions' ? null : 'actions');
-                    if (drawerMode !== 'actions') trigger('medium');
+                    setDrawerMode(drawerMode === "actions" ? null : "actions");
+                    if (drawerMode !== "actions") trigger("medium");
                   }}
-                  variant={drawerMode === 'actions' ? 'default' : 'outline'}
+                  variant={drawerMode === "actions" ? "default" : "outline"}
                   className="rounded-full px-5 py-2.5 h-auto font-semibold transition-all"
                 >
                   <Zap className="h-4 w-4 mr-2" />
@@ -270,7 +288,7 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
             </div>
 
             {/* Conversation Stack - Scrollable Container */}
-            <div ref={conversationRef} className="flex-1 min-h-0 flex flex-col">
+            <div ref={conversationRef} className="flex-1 min-h-0 flex flex-col h-full">
               {isLoadingConversation ? (
                 <ConversationThreadSkeleton />
               ) : (
@@ -295,16 +313,18 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
           <DrawerHeader className="px-8 pb-6">
             <DrawerTitle className="text-2xl font-bold">
-              {drawerMode === 'customer' ? 'Customer Information' : 'Quick Actions'}
+              {drawerMode === "customer" ? "Customer Information" : "Quick Actions"}
             </DrawerTitle>
           </DrawerHeader>
 
           <div className="flex-1 overflow-y-auto px-8 pb-8">
-            {drawerMode === 'customer' && selectedConversation && (
+            {drawerMode === "customer" && selectedConversation && (
               <div className="space-y-6">
                 {/* Contact Info */}
                 <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Contact Information</h3>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                    Contact Information
+                  </h3>
                   <div className="space-y-4">
                     {selectedConversation.metadata?.customer_email && (
                       <div className="flex items-center gap-4">
@@ -313,7 +333,9 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-muted-foreground mb-1">Email</p>
-                          <p className="text-base font-medium truncate">{selectedConversation.metadata.customer_email as string}</p>
+                          <p className="text-base font-medium truncate">
+                            {selectedConversation.metadata.customer_email as string}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -324,7 +346,9 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-muted-foreground mb-1">Phone</p>
-                          <p className="text-base font-medium">{selectedConversation.metadata.customer_phone as string}</p>
+                          <p className="text-base font-medium">
+                            {selectedConversation.metadata.customer_phone as string}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -333,16 +357,24 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
                 {/* Recent History */}
                 <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Recent History</h3>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                    Recent History
+                  </h3>
                   <div className="space-y-3">
                     <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/40">
                       <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                      <p className="text-sm">Created {formatDistanceToNow(new Date(selectedConversation.created_at || ''), { addSuffix: true })}</p>
+                      <p className="text-sm">
+                        Created{" "}
+                        {formatDistanceToNow(new Date(selectedConversation.created_at || ""), { addSuffix: true })}
+                      </p>
                     </div>
                     {selectedConversation.first_response_at && (
                       <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/40">
                         <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                        <p className="text-sm">First response {formatDistanceToNow(new Date(selectedConversation.first_response_at), { addSuffix: true })}</p>
+                        <p className="text-sm">
+                          First response{" "}
+                          {formatDistanceToNow(new Date(selectedConversation.first_response_at), { addSuffix: true })}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -351,7 +383,9 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
                 {/* Category */}
                 {selectedConversation.category && (
                   <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Category</h3>
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                      Category
+                    </h3>
                     <div className="flex items-center gap-3">
                       <div className="h-12 w-12 rounded-xl bg-accent flex items-center justify-center flex-shrink-0">
                         <Tag className="h-5 w-5 text-accent-foreground" />
@@ -365,24 +399,26 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
               </div>
             )}
 
-            {drawerMode === 'actions' && selectedConversation && (
+            {drawerMode === "actions" && selectedConversation && (
               <div className="space-y-5">
                 {/* Resolve Button */}
                 <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
                   <Button
                     onClick={handleResolve}
                     className="w-full h-14 bg-success hover:bg-success/90 text-success-foreground font-semibold rounded-xl text-base shadow-sm"
-                    disabled={selectedConversation.status === 'resolved'}
+                    disabled={selectedConversation.status === "resolved"}
                   >
                     <CheckCircle2 className="h-5 w-5 mr-3" />
-                    {selectedConversation.status === 'resolved' ? 'Resolved' : 'Resolve & Close'}
+                    {selectedConversation.status === "resolved" ? "Resolved" : "Resolve & Close"}
                   </Button>
                 </div>
 
                 {/* Priority Selector */}
                 <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
-                  <label className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 block">Change Priority</label>
-                  <Select value={selectedConversation.priority || 'medium'} onValueChange={handlePriorityChange}>
+                  <label className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 block">
+                    Change Priority
+                  </label>
+                  <Select value={selectedConversation.priority || "medium"} onValueChange={handlePriorityChange}>
                     <SelectTrigger className="h-14 rounded-xl bg-muted/50 text-base">
                       <SelectValue />
                     </SelectTrigger>
@@ -445,12 +481,7 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
       )}
 
       {/* Floating Back to List FAB */}
-      {selectedConversation && (
-        <BackToListFAB
-          visible={isScrolled}
-          onClick={handleBackToList}
-        />
-      )}
+      {selectedConversation && <BackToListFAB visible={isScrolled} onClick={handleBackToList} />}
     </div>
   );
 };
