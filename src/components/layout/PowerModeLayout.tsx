@@ -28,7 +28,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
       </aside>
 
       {/* Main Content - 3 Column Layout (responsive) */}
-      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0 h-full">
         {/* Conversation List Panel (hidden on mobile when conversation selected) */}
         <ResizablePanel 
           defaultSize={20} 
