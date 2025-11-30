@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Conversation } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
@@ -17,7 +18,7 @@ interface ConversationCardProps {
   onUpdate?: () => void;
 }
 
-export const ConversationCard = ({ conversation, selected, onClick, onUpdate }: ConversationCardProps) => {
+const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }: ConversationCardProps) => {
   const isTablet = useIsTablet();
   const { trigger } = useHaptics();
   const { toast } = useToast();
@@ -382,3 +383,15 @@ export const ConversationCard = ({ conversation, selected, onClick, onUpdate }: 
     </div>
   );
 };
+
+// Memoize to prevent unnecessary re-renders
+export const ConversationCard = memo(ConversationCardComponent, (prevProps, nextProps) => {
+  // Only re-render if these props change
+  return (
+    prevProps.conversation.id === nextProps.conversation.id &&
+    prevProps.conversation.updated_at === nextProps.conversation.updated_at &&
+    prevProps.conversation.status === nextProps.conversation.status &&
+    prevProps.conversation.priority === nextProps.conversation.priority &&
+    prevProps.selected === nextProps.selected
+  );
+});

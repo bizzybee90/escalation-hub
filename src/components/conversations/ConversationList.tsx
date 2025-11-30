@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import PullToRefresh from 'react-simple-pull-to-refresh';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface ConversationListProps {
   selectedId?: string;
@@ -22,9 +23,6 @@ interface ConversationListProps {
 }
 
 export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', onConversationsChange, channelFilter: initialChannelFilter }: ConversationListProps) => {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
   const isTablet = useIsTablet();
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -38,16 +36,34 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   });
   const parentRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 50;
-  const lastUpdateRef = useRef<number>(0);
+  const queryClient = useQueryClient();
 
   // Persist sort preference
   useEffect(() => {
     localStorage.setItem('conversation-sort', sortBy);
   }, [sortBy]);
 
-  const fetchConversations = useCallback(async (pageNum: number = 0, append: boolean = false) => {
+  const fetchConversations = async (pageNum: number = 0) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) return { data: [], count: 0 };
+
+    // Use optimized RPC for "sent" filter
+    if (filter === 'sent') {
+      const { data, error } = await supabase.rpc('get_sent_conversations', {
+        p_user_id: user.id,
+        p_limit: PAGE_SIZE,
+        p_offset: pageNum * PAGE_SIZE
+      });
+
+      if (error) throw error;
+      
+      const activeConversations = (data || []).filter((conv: any) => {
+        if (!conv.snoozed_until) return true;
+        return new Date(conv.snoozed_until) <= new Date();
+      });
+
+      return { data: activeConversations, count: activeConversations.length };
+    }
 
     let query = supabase
       .from('conversations')
@@ -88,24 +104,6 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
     } else if (filter === 'completed') {
       query = query.eq('status', 'resolved');
-    } else if (filter === 'sent') {
-      const { data: sentConvIds } = await supabase
-        .from('messages')
-        .select('conversation_id')
-        .eq('actor_id', user.id)
-        .eq('direction', 'outbound')
-        .eq('is_internal', false);
-      
-      if (sentConvIds && sentConvIds.length > 0) {
-        const convIds = [...new Set(sentConvIds.map(m => m.conversation_id))];
-        query = query.in('id', convIds);
-      } else {
-        setConversations([]);
-        onConversationsChange?.([]);
-        setLoading(false);
-        setHasMore(false);
-        return;
-      }
     } else if (filter === 'high-priority') {
       query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
     } else if (filter === 'vip-customers') {
@@ -131,33 +129,40 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     // Add pagination
     query = query.range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
 
-    const { data, count } = await query;
-    if (data) {
-      const conversationData = data as any;
-      const activeConversations = conversationData.filter((conv: any) => {
-        if (!conv.snoozed_until) return true;
-        return new Date(conv.snoozed_until) <= new Date();
-      });
-      
-      if (append) {
-        setConversations(prev => [...prev, ...activeConversations]);
-      } else {
-        setConversations(activeConversations);
-      }
-      
-      onConversationsChange?.(activeConversations);
-      setHasMore(count ? (pageNum + 1) * PAGE_SIZE < count : false);
-    }
-    setLoading(false);
-  }, [filter, statusFilter, priorityFilter, channelFilter, categoryFilter, sortBy, onConversationsChange]);
+    const { data, count, error } = await query;
+    if (error) throw error;
 
+    const conversationData = data as any;
+    const activeConversations = conversationData.filter((conv: any) => {
+      if (!conv.snoozed_until) return true;
+      return new Date(conv.snoozed_until) <= new Date();
+    });
+
+    return { data: activeConversations, count: count || 0 };
+  };
+
+  // React Query setup with optimistic UI
+  const queryKey = ['conversations', filter, statusFilter, priorityFilter, channelFilter, categoryFilter, sortBy, page];
+  
+  const { data: queryData, isLoading, isFetching } = useQuery({
+    queryKey,
+    queryFn: () => fetchConversations(page),
+    staleTime: 30000, // Cache for 30 seconds
+    refetchInterval: 60000, // Refetch every 60 seconds in background
+  });
+
+  const conversations = queryData?.data || [];
+  const hasMore = queryData ? (page + 1) * PAGE_SIZE < (queryData.count || 0) : false;
+
+  // Notify parent of conversation changes
   useEffect(() => {
-    setLoading(true);
-    setPage(0);
-    setHasMore(true);
-    fetchConversations(0, false);
+    if (conversations.length > 0) {
+      onConversationsChange?.(conversations);
+    }
+  }, [conversations, onConversationsChange]);
 
-    // Debounced real-time subscription
+  // Real-time updates
+  useEffect(() => {
     const channel = supabase
       .channel('conversations-changes')
       .on(
@@ -168,12 +173,8 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
           table: 'conversations'
         },
         () => {
-          const now = Date.now();
-          if (now - lastUpdateRef.current > 2000) {
-            lastUpdateRef.current = now;
-            setPage(0);
-            fetchConversations(0, false);
-          }
+          // Invalidate and refetch current page
+          queryClient.invalidateQueries({ queryKey: ['conversations', filter] });
         }
       )
       .subscribe();
@@ -181,22 +182,24 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [filter, statusFilter, priorityFilter, channelFilter, categoryFilter, sortBy, fetchConversations]);
+  }, [filter, queryClient]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(0);
+  }, [filter, statusFilter, priorityFilter, channelFilter, categoryFilter, sortBy]);
 
   const loadMore = useCallback(() => {
-    if (!loading && hasMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchConversations(nextPage, true);
+    if (!isLoading && !isFetching && hasMore) {
+      setPage(prev => prev + 1);
     }
-  }, [loading, hasMore, page, fetchConversations]);
+  }, [isLoading, isFetching, hasMore]);
 
   const activeFilterCount = statusFilter.length + priorityFilter.length + channelFilter.length + categoryFilter.length;
 
   const handleRefresh = async () => {
-    setLoading(true);
     setPage(0);
-    await fetchConversations(0, false);
+    await queryClient.invalidateQueries({ queryKey: ['conversations', filter] });
   };
 
   const isTouchDevice = () => {
@@ -212,8 +215,8 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     </div>
   );
 
-  // Render skeleton while loading initial data
-  if (loading && conversations.length === 0) {
+  // Show skeleton only on initial load (not when refetching)
+  if (isLoading && conversations.length === 0) {
     return (
       <div className={cn(
         "flex flex-col h-full",
@@ -233,12 +236,12 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       )}
       onScroll={(e) => {
         const bottom = e.currentTarget.scrollHeight - e.currentTarget.scrollTop <= e.currentTarget.clientHeight + 100;
-        if (bottom && !loading && hasMore) {
+        if (bottom && !isLoading && !isFetching && hasMore) {
           loadMore();
         }
       }}
     >
-      {conversations.length === 0 && !loading ? (
+      {conversations.length === 0 && !isLoading ? (
         <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
           <p className={cn(
             "font-medium",
@@ -257,7 +260,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
               onUpdate={handleRefresh}
             />
           ))}
-          {loading && (
+          {isFetching && (
             <div className="flex justify-center py-4">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
