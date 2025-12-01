@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Activity, User, Bot } from 'lucide-react';
+import { Activity, User, Bot, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface RecentActivity {
   id: string;
+  type: 'message' | 'escalation' | 'resolution';
   body: string;
   actor_name: string | null;
   actor_type: string;
@@ -21,12 +22,77 @@ export const RecentActivityWidget = () => {
   const [activities, setActivities] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchRecentActivity = async () => {
+    setLoading(true);
+    
+    // Fetch recent outbound messages
+    const { data: messages } = await supabase
+      .from('messages')
+      .select('id, body, actor_name, actor_type, channel, created_at, conversation_id')
+      .eq('direction', 'outbound')
+      .eq('is_internal', false)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    // Fetch recent escalations (today)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const { data: escalations } = await supabase
+      .from('conversations')
+      .select('id, title, channel, escalated_at')
+      .eq('is_escalated', true)
+      .gte('escalated_at', today.toISOString())
+      .order('escalated_at', { ascending: false })
+      .limit(5);
+
+    // Fetch recent resolutions (today)
+    const { data: resolutions } = await supabase
+      .from('conversations')
+      .select('id, title, channel, resolved_at')
+      .eq('status', 'resolved')
+      .gte('resolved_at', today.toISOString())
+      .order('resolved_at', { ascending: false })
+      .limit(5);
+
+    // Merge and sort by timestamp
+    const combined: RecentActivity[] = [
+      ...(messages?.map(m => ({ 
+        ...m, 
+        type: 'message' as const 
+      })) || []),
+      ...(escalations?.map(e => ({ 
+        id: e.id, 
+        type: 'escalation' as const,
+        body: e.title || 'New escalation',
+        actor_name: null,
+        actor_type: 'system',
+        channel: e.channel,
+        created_at: e.escalated_at!,
+        conversation_id: e.id
+      })) || []),
+      ...(resolutions?.map(r => ({ 
+        id: r.id, 
+        type: 'resolution' as const,
+        body: r.title || 'Conversation resolved',
+        actor_name: null,
+        actor_type: 'system',
+        channel: r.channel,
+        created_at: r.resolved_at!,
+        conversation_id: r.id
+      })) || [])
+    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+     .slice(0, 10);
+
+    setActivities(combined);
+    setLoading(false);
+  };
+
   useEffect(() => {
     fetchRecentActivity();
 
-    // Subscribe to real-time updates
-    const channel = supabase
-      .channel('recent-activity')
+    // Subscribe to real-time updates for messages
+    const messageChannel = supabase
+      .channel('recent-activity-messages')
       .on(
         'postgres_changes',
         {
@@ -36,38 +102,88 @@ export const RecentActivityWidget = () => {
           filter: 'direction=eq.outbound'
         },
         (payload) => {
-          const newMessage = payload.new as RecentActivity;
-          setActivities((prev) => [newMessage, ...prev].slice(0, 10));
+          const newMessage = payload.new as any;
+          if (!newMessage.is_internal) {
+            setActivities((prev) => [{
+              ...newMessage,
+              type: 'message'
+            }, ...prev].slice(0, 10));
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to conversation status changes
+    const conversationChannel = supabase
+      .channel('recent-activity-conversations')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations'
+        },
+        (payload) => {
+          const conv = payload.new as any;
+          const oldConv = payload.old as any;
+          
+          // New escalation
+          if (conv.is_escalated && !oldConv.is_escalated) {
+            const newActivity: RecentActivity = {
+              id: conv.id,
+              type: 'escalation',
+              body: conv.title || 'New escalation',
+              actor_name: null,
+              actor_type: 'system',
+              channel: conv.channel,
+              created_at: conv.escalated_at || conv.updated_at,
+              conversation_id: conv.id
+            };
+            setActivities((prev) => [newActivity, ...prev].slice(0, 10));
+          }
+          
+          // New resolution
+          if (conv.status === 'resolved' && oldConv.status !== 'resolved') {
+            const newActivity: RecentActivity = {
+              id: conv.id,
+              type: 'resolution',
+              body: conv.title || 'Conversation resolved',
+              actor_name: null,
+              actor_type: 'system',
+              channel: conv.channel,
+              created_at: conv.resolved_at || conv.updated_at,
+              conversation_id: conv.id
+            };
+            setActivities((prev) => [newActivity, ...prev].slice(0, 10));
+          }
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(messageChannel);
+      supabase.removeChannel(conversationChannel);
     };
   }, []);
 
-  const fetchRecentActivity = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('messages')
-      .select('id, body, actor_name, actor_type, channel, created_at, conversation_id')
-      .eq('direction', 'outbound')
-      .eq('is_internal', false)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (data) {
-      setActivities(data as RecentActivity[]);
+  const getActivityIcon = (activity: RecentActivity) => {
+    if (activity.type === 'escalation') {
+      return <AlertTriangle className="h-4 w-4 text-orange-500" />;
     }
-    setLoading(false);
-  };
-
-  const getActorIcon = (actorType: string) => {
-    if (actorType === 'ai_agent') {
+    if (activity.type === 'resolution') {
+      return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+    }
+    if (activity.actor_type === 'ai_agent') {
       return <Bot className="h-4 w-4 text-blue-600" />;
     }
     return <User className="h-4 w-4 text-green-600" />;
+  };
+
+  const getActivityLabel = (activity: RecentActivity) => {
+    if (activity.type === 'escalation') return 'Escalated';
+    if (activity.type === 'resolution') return 'Resolved';
+    if (activity.actor_type === 'ai_agent') return 'AI Reply';
+    return 'Reply Sent';
   };
 
   return (
@@ -105,17 +221,22 @@ export const RecentActivityWidget = () => {
                   className="flex items-start gap-3 pb-3 border-b last:border-0"
                 >
                   <div className="flex-shrink-0 mt-1">
-                    {getActorIcon(activity.actor_type)}
+                    {getActivityIcon(activity)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-sm font-medium truncate">
-                        {activity.actor_name || 'Unknown'}
-                      </p>
-                      <ChannelIcon channel={activity.channel} className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span className="text-xs text-muted-foreground capitalize">
-                        {activity.channel}
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {getActivityLabel(activity)}
                       </span>
+                      {activity.type === 'message' && (
+                        <>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <p className="text-sm font-medium truncate">
+                            {activity.actor_name || 'Unknown'}
+                          </p>
+                        </>
+                      )}
+                      <ChannelIcon channel={activity.channel} className="h-3.5 w-3.5 flex-shrink-0 ml-auto" />
                     </div>
                     <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
                       {activity.body}
