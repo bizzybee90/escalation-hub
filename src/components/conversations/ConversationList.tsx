@@ -47,7 +47,12 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
   const fetchConversations = async (pageNum: number = 0) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { data: [], count: 0 };
+    console.log('🔍 [ConversationList] Fetching conversations for user:', user?.id);
+    
+    if (!user) {
+      console.error('❌ [ConversationList] No authenticated user');
+      return { data: [], count: 0 };
+    }
 
     // Use optimized RPC for "sent" filter
     if (filter === 'sent') {
@@ -64,17 +69,30 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         return new Date(conv.snoozed_until) <= new Date();
       });
 
+      console.log('✅ [ConversationList] Sent conversations fetched:', activeConversations.length);
       return { data: activeConversations, count: activeConversations.length };
     }
 
     // Get workspace from user
-    const { data: userData } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('workspace_id')
       .eq('id', user.id)
       .single();
     
-    if (!userData?.workspace_id) return { data: [], count: 0 };
+    console.log('🏢 [ConversationList] User workspace data:', userData);
+    
+    if (userError) {
+      console.error('❌ [ConversationList] Error fetching user workspace:', userError);
+      return { data: [], count: 0 };
+    }
+    
+    if (!userData?.workspace_id) {
+      console.error('❌ [ConversationList] User has no workspace_id assigned');
+      return { data: [], count: 0 };
+    }
+    
+    console.log('✅ [ConversationList] Using workspace_id:', userData.workspace_id);
 
     let query = supabase
       .from('conversations')
@@ -121,8 +139,10 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     } else if (filter === 'vip-customers') {
       query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (filter === 'escalations') {
-      query = query.eq('is_escalated', true).in('status', ['new', 'in_progress', 'waiting', 'open', 'escalated']);
+      query = query.eq('is_escalated', true).in('status', ['new', 'in_progress', 'waiting', 'open', 'escalated', 'ai_handling']);
     }
+    
+    console.log('🔎 [ConversationList] Applied filter:', filter);
 
     // Apply additional filters
     if (statusFilter.length > 0) {
@@ -142,7 +162,16 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     query = query.range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
 
     const { data, count, error } = await query;
-    if (error) throw error;
+    if (error) {
+      console.error('❌ [ConversationList] Query error:', error);
+      throw error;
+    }
+
+    console.log('📊 [ConversationList] Raw query result:', {
+      totalCount: count,
+      dataLength: data?.length,
+      firstConv: data?.[0]
+    });
 
     const conversationData = data as any;
     const activeConversations = conversationData.filter((conv: any) => {
@@ -150,15 +179,23 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       return new Date(conv.snoozed_until) <= new Date();
     });
 
+    console.log('✅ [ConversationList] Active conversations after filtering:', activeConversations.length);
     return { data: activeConversations, count: count || 0 };
   };
+
+  // Track last update time
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   // React Query setup with optimistic UI
   const queryKey = ['conversations', filter, statusFilter, priorityFilter, channelFilter, categoryFilter, sortBy, page];
   
   const { data: queryData, isLoading, isFetching } = useQuery({
     queryKey,
-    queryFn: () => fetchConversations(page),
+    queryFn: async () => {
+      const result = await fetchConversations(page);
+      setLastUpdated(new Date());
+      return result;
+    },
     staleTime: 30000, // Cache for 30 seconds
     refetchInterval: 60000, // Refetch every 60 seconds in background
   });
@@ -186,25 +223,42 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     }
   }, [conversations, onConversationsChange]);
 
-  // Real-time updates
+  // Real-time updates with improved subscription
   useEffect(() => {
+    console.log('🔔 [ConversationList] Setting up realtime subscription for filter:', filter);
+    
     const channel = supabase
       .channel('conversations-changes')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'conversations'
         },
-        () => {
-          // Invalidate and refetch current page
-          queryClient.invalidateQueries({ queryKey: ['conversations', filter] });
+        (payload) => {
+          console.log('➕ [ConversationList] New conversation inserted:', payload.new);
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations'
+        },
+        (payload) => {
+          console.log('🔄 [ConversationList] Conversation updated:', payload.new);
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔔 [ConversationList] Realtime subscription status:', status);
+      });
 
     return () => {
+      console.log('🔕 [ConversationList] Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [filter, queryClient]);
@@ -223,8 +277,18 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   const activeFilterCount = statusFilter.length + priorityFilter.length + channelFilter.length + categoryFilter.length;
 
   const handleRefresh = async () => {
+    console.log('🔄 [ConversationList] Manual refresh triggered');
     setPage(0);
-    await queryClient.invalidateQueries({ queryKey: ['conversations', filter] });
+    await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+  };
+
+  const getTimeSinceUpdate = () => {
+    const seconds = Math.floor((new Date().getTime() - lastUpdated.getTime()) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
   };
 
   const isTouchDevice = () => {
@@ -305,6 +369,20 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         "py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm space-y-2",
         isTablet ? "px-0 mb-4" : "px-4"
       )}>
+        {/* Last Updated Indicator */}
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+          <span>Last updated: {getTimeSinceUpdate()}</span>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="h-6 px-2 text-xs"
+          >
+            {isFetching ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        </div>
+        
         {/* Search Input */}
         <SearchInput 
           value={searchQuery} 
