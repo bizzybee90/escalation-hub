@@ -4,6 +4,7 @@ import { Conversation } from '@/lib/types';
 import { ConversationCard } from './ConversationCard';
 import { ConversationCardSkeleton } from './ConversationCardSkeleton';
 import { ConversationFilters } from './ConversationFilters';
+import { SearchInput } from './SearchInput';
 import { useIsTablet } from '@/hooks/use-tablet';
 import { Loader2, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   const [sortBy, setSortBy] = useState<string>(() => {
     return localStorage.getItem('conversation-sort') || 'sla_urgent';
   });
+  const [searchQuery, setSearchQuery] = useState('');
   const parentRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 50;
   const queryClient = useQueryClient();
@@ -154,6 +156,19 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   const conversations = queryData?.data || [];
   const hasMore = queryData ? (page + 1) * PAGE_SIZE < (queryData.count || 0) : false;
 
+  // Filter conversations by search query
+  const filteredConversations = conversations.filter(conv => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      conv.title?.toLowerCase().includes(query) ||
+      conv.summary_for_human?.toLowerCase().includes(query) ||
+      (conv as any).customer?.name?.toLowerCase().includes(query) ||
+      (conv as any).customer?.email?.toLowerCase().includes(query) ||
+      (conv as any).customer?.phone?.toLowerCase().includes(query)
+    );
+  });
+
   // Notify parent of conversation changes
   useEffect(() => {
     if (conversations.length > 0) {
@@ -187,7 +202,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   // Reset page when filters change
   useEffect(() => {
     setPage(0);
-  }, [filter, statusFilter, priorityFilter, channelFilter, categoryFilter, sortBy]);
+  }, [filter, statusFilter, priorityFilter, channelFilter, categoryFilter, sortBy, searchQuery]);
 
   const loadMore = useCallback(() => {
     if (!isLoading && !isFetching && hasMore) {
@@ -241,7 +256,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         }
       }}
     >
-      {conversations.length === 0 && !isLoading ? (
+      {filteredConversations.length === 0 && !isLoading ? (
         <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
           <p className={cn(
             "font-medium",
@@ -251,7 +266,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         </div>
       ) : (
         <>
-          {conversations.map((conversation) => (
+          {filteredConversations.map((conversation) => (
             <ConversationCard
               key={conversation.id}
               conversation={conversation}
@@ -275,11 +290,18 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       "flex flex-col h-full",
       isTablet ? "bg-transparent" : "bg-muted/30 min-w-[300px]"
     )}>
-      {/* Filter and Sort Controls */}
+      {/* Search and Filter Controls */}
       <div className={cn(
         "py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm space-y-2",
         isTablet ? "px-0 mb-4" : "px-4"
       )}>
+        {/* Search Input */}
+        <SearchInput 
+          value={searchQuery} 
+          onChange={setSearchQuery}
+          placeholder="Search by name, email, or content..."
+        />
+        
         <div className="flex gap-2">
           <Popover>
             <PopoverTrigger asChild>

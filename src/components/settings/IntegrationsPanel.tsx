@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Phone, Mail, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { Phone, Mail, ExternalLink, CheckCircle2, Copy } from 'lucide-react';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -54,6 +54,14 @@ export const IntegrationsPanel = () => {
     }
   };
 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
+  };
+
+  const twilioWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/receive-message`;
+  const emailWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/receive-email`;
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
@@ -91,6 +99,23 @@ export const IntegrationsPanel = () => {
           <div className="flex items-center justify-between py-3 border-b">
             <span className="text-sm font-medium">Account SID</span>
             <code className="text-sm bg-muted px-2 py-1 rounded">AC*********************</code>
+          </div>
+
+          <div className="flex items-center justify-between py-3 border-b">
+            <span className="text-sm font-medium">Incoming Webhook URL</span>
+            <div className="flex items-center gap-2">
+              <code className="text-xs bg-muted px-2 py-1 rounded max-w-[280px] truncate">
+                {twilioWebhookUrl}
+              </code>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-7 w-7"
+                onClick={() => copyToClipboard(twilioWebhookUrl)}
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 pt-2">
@@ -144,6 +169,23 @@ export const IntegrationsPanel = () => {
           <div className="flex items-center justify-between py-3 border-b">
             <span className="text-sm font-medium">API Key</span>
             <code className="text-sm bg-muted px-2 py-1 rounded">*********************</code>
+          </div>
+
+          <div className="flex items-center justify-between py-3 border-b">
+            <span className="text-sm font-medium">Email Webhook URL</span>
+            <div className="flex items-center gap-2">
+              <code className="text-xs bg-muted px-2 py-1 rounded max-w-[280px] truncate">
+                {emailWebhookUrl}
+              </code>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-7 w-7"
+                onClick={() => copyToClipboard(emailWebhookUrl)}
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 pt-2">
