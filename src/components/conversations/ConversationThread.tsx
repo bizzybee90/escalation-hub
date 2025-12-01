@@ -131,32 +131,14 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
         .eq('id', conversation.id);
     }
 
-    // Send to n8n if not internal
-    if (!isInternal && newMessage) {
-      try {
-        const { error: webhookError } = await supabase.functions.invoke('send-to-n8n', {
-          body: {
-            conversationId: conversation.id,
-            messageId: newMessage.id,
-            response: body
-          }
-        });
-
-        if (webhookError) {
-          console.error('Error sending to n8n:', webhookError);
-          toast({
-            title: "Warning",
-            description: "Message saved but failed to send to n8n",
-            variant: "destructive"
-          });
-        }
-      } catch (err) {
-        console.error('Error invoking send-to-n8n:', err);
-      }
-    }
-
     // Clear draft after successful send
     localStorage.removeItem(`draft-${conversation.id}`);
+    
+    // Show success toast
+    toast({
+      title: "Message sent",
+      description: "Your reply has been saved successfully",
+    });
     
     // Trigger update to refresh conversation list
     onUpdate();
