@@ -107,13 +107,13 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
 
     // Apply view filter (matching desktop logic exactly)
     if (currentFilter === 'my-tickets') {
-      query = query.eq('assigned_to', user.id).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling']);
+      query = query.eq('assigned_to', user.id).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (currentFilter === 'unassigned') {
-      query = query.is('assigned_to', null).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling']);
+      query = query.is('assigned_to', null).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (currentFilter === 'sla-risk') {
-      query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling']);
+      query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (currentFilter === 'all-open') {
-      query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling']);
+      query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (currentFilter === 'completed') {
       query = query.eq('status', 'resolved');
     } else if (currentFilter === 'sent') {
@@ -133,9 +133,9 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
         return;
       }
     } else if (currentFilter === 'high-priority') {
-      query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling']);
+      query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (currentFilter === 'vip-customers') {
-      query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling']);
+      query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     }
 
     // Apply additional filters
