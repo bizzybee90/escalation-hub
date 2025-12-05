@@ -1,0 +1,283 @@
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/hooks/useWorkspace';
+import { Upload, Save, Eye, Building2 } from 'lucide-react';
+
+interface EmailSettings {
+  id?: string;
+  from_name: string;
+  reply_to_email: string;
+  signature_html: string;
+  logo_url: string;
+  company_name: string;
+  company_phone: string;
+  company_website: string;
+  company_address: string;
+}
+
+const defaultSettings: EmailSettings = {
+  from_name: '',
+  reply_to_email: '',
+  signature_html: '',
+  logo_url: '',
+  company_name: '',
+  company_phone: '',
+  company_website: '',
+  company_address: '',
+};
+
+export function EmailSettingsPanel() {
+  const { workspace } = useWorkspace();
+  const workspaceId = workspace?.id;
+  const { toast } = useToast();
+  const [settings, setSettings] = useState<EmailSettings>(defaultSettings);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
+  useEffect(() => {
+    if (workspaceId) {
+      fetchSettings();
+    }
+  }, [workspaceId]);
+
+  const fetchSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('email_settings')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        setSettings(data as EmailSettings);
+      }
+    } catch (error) {
+      console.error('Error fetching email settings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${workspaceId}/logo-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('email-assets')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('email-assets')
+        .getPublicUrl(fileName);
+
+      setSettings(prev => ({ ...prev, logo_url: publicUrl }));
+      toast({ title: 'Logo uploaded successfully' });
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      toast({ title: 'Failed to upload logo', variant: 'destructive' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const generateSignatureHtml = (): string => {
+    const { company_name, company_phone, company_website, company_address, logo_url, from_name } = settings;
+    
+    return `
+<table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 12px; color: #333;">
+  <tr>
+    <td style="padding-right: 15px; vertical-align: top;">
+      ${logo_url ? `<img src="${logo_url}" alt="${company_name}" style="max-width: 80px; max-height: 80px;" />` : ''}
+    </td>
+    <td style="vertical-align: top; border-left: 2px solid #1976d2; padding-left: 15px;">
+      ${from_name ? `<div style="font-weight: bold; font-size: 14px; color: #1976d2;">${from_name}</div>` : ''}
+      ${company_name ? `<div style="margin-top: 4px;">${company_name}</div>` : ''}
+      ${company_phone ? `<div style="margin-top: 4px;">📞 ${company_phone}</div>` : ''}
+      ${company_website ? `<div style="margin-top: 4px;">🌐 <a href="${company_website}" style="color: #1976d2;">${company_website.replace(/^https?:\/\//, '')}</a></div>` : ''}
+      ${company_address ? `<div style="margin-top: 4px; color: #666;">${company_address}</div>` : ''}
+    </td>
+  </tr>
+</table>
+    `.trim();
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      // Generate signature HTML from settings
+      const signatureHtml = generateSignatureHtml();
+      const dataToSave = { ...settings, signature_html: signatureHtml, workspace_id: workspaceId };
+
+      if (settings.id) {
+        const { error } = await supabase
+          .from('email_settings')
+          .update(dataToSave)
+          .eq('id', settings.id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('email_settings')
+          .insert(dataToSave)
+          .select()
+          .single();
+        if (error) throw error;
+        setSettings(prev => ({ ...prev, id: data.id, signature_html: signatureHtml }));
+      }
+
+      toast({ title: 'Email settings saved' });
+    } catch (error) {
+      console.error('Error saving email settings:', error);
+      toast({ title: 'Failed to save settings', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="animate-pulse">Loading email settings...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Company Details
+          </CardTitle>
+          <CardDescription>
+            Configure your company information for email signatures
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>From Name</Label>
+              <Input
+                value={settings.from_name}
+                onChange={e => setSettings(prev => ({ ...prev, from_name: e.target.value }))}
+                placeholder="MAC Cleaning Support"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Reply-To Email</Label>
+              <Input
+                type="email"
+                value={settings.reply_to_email}
+                onChange={e => setSettings(prev => ({ ...prev, reply_to_email: e.target.value }))}
+                placeholder="support@company.com"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Company Name</Label>
+              <Input
+                value={settings.company_name}
+                onChange={e => setSettings(prev => ({ ...prev, company_name: e.target.value }))}
+                placeholder="MAC Cleaning Services"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone Number</Label>
+              <Input
+                value={settings.company_phone}
+                onChange={e => setSettings(prev => ({ ...prev, company_phone: e.target.value }))}
+                placeholder="+44 123 456 7890"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Website</Label>
+              <Input
+                value={settings.company_website}
+                onChange={e => setSettings(prev => ({ ...prev, company_website: e.target.value }))}
+                placeholder="https://www.company.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Address</Label>
+              <Input
+                value={settings.company_address}
+                onChange={e => setSettings(prev => ({ ...prev, company_address: e.target.value }))}
+                placeholder="123 Main St, London, UK"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Company Logo</Label>
+            <div className="flex items-center gap-4">
+              {settings.logo_url && (
+                <img src={settings.logo_url} alt="Logo" className="h-16 w-auto rounded border" />
+              )}
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                  id="logo-upload"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => document.getElementById('logo-upload')?.click()}
+                  disabled={uploading}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {uploading ? 'Uploading...' : 'Upload Logo'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Email Signature Preview</span>
+            <Button variant="ghost" size="sm" onClick={() => setShowPreview(!showPreview)}>
+              <Eye className="h-4 w-4 mr-2" />
+              {showPreview ? 'Hide' : 'Show'} Preview
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        {showPreview && (
+          <CardContent>
+            <div 
+              className="p-4 bg-muted rounded-lg border"
+              dangerouslySetInnerHTML={{ __html: generateSignatureHtml() }}
+            />
+          </CardContent>
+        )}
+      </Card>
+
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={saving}>
+          <Save className="h-4 w-4 mr-2" />
+          {saving ? 'Saving...' : 'Save Settings'}
+        </Button>
+      </div>
+    </div>
+  );
+}

@@ -17,7 +17,201 @@ interface SendRequest {
     path: string;
     type: string;
   }>;
-  skipMessageLog?: boolean; // Skip logging if message already saved by frontend
+  skipMessageLog?: boolean;
+}
+
+// Send email via Gmail API
+async function sendViaGmail(
+  sendRequest: SendRequest,
+  supabase: any
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    
+    // Get conversation to find workspace
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('workspace_id, external_conversation_id, metadata')
+      .eq('id', sendRequest.conversationId)
+      .single();
+
+    if (!conversation) {
+      return { success: false, error: 'Conversation not found' };
+    }
+
+    // Get Gmail config for workspace
+    const { data: gmailConfig } = await supabase
+      .from('gmail_channel_configs')
+      .select('*')
+      .eq('workspace_id', conversation.workspace_id)
+      .maybeSingle();
+
+    if (!gmailConfig) {
+      console.log('No Gmail config found, will use fallback');
+      return { success: false, error: 'Gmail not configured' };
+    }
+
+    // Refresh token if needed
+    let accessToken = gmailConfig.access_token;
+    if (new Date(gmailConfig.token_expires_at) < new Date()) {
+      accessToken = await refreshGmailToken(gmailConfig.refresh_token, supabase, gmailConfig.id);
+    }
+
+    // Get email settings for signature
+    const { data: emailSettings } = await supabase
+      .from('email_settings')
+      .select('*')
+      .eq('workspace_id', conversation.workspace_id)
+      .maybeSingle();
+
+    // Build email with signature
+    const htmlBody = buildEmailWithSignature(sendRequest.message, emailSettings);
+    
+    // Get thread ID for reply
+    const threadId = conversation.external_conversation_id?.replace('gmail:', '') || null;
+
+    // Build raw email
+    const rawEmail = buildRawEmail({
+      to: sendRequest.to,
+      from: gmailConfig.email_address,
+      subject: sendRequest.metadata?.subject || 'Re: Your inquiry',
+      htmlBody,
+      textBody: sendRequest.message,
+      threadId,
+      inReplyTo: conversation.metadata?.gmail_message_id,
+    });
+
+    // Send via Gmail API
+    const sendUrl = threadId 
+      ? `https://www.googleapis.com/gmail/v1/users/me/messages/send`
+      : `https://www.googleapis.com/gmail/v1/users/me/messages/send`;
+
+    const response = await fetch(sendUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        raw: rawEmail,
+        threadId: threadId || undefined,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Gmail API error:', response.status, errorText);
+      return { success: false, error: `Gmail error: ${response.status}` };
+    }
+
+    const result = await response.json();
+    console.log('Email sent via Gmail:', result.id);
+
+    return { success: true, messageId: result.id };
+  } catch (error) {
+    console.error('Gmail send error:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+async function refreshGmailToken(refreshToken: string, supabase: any, configId: string): Promise<string> {
+  const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID');
+  const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET');
+
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID!,
+      client_secret: GOOGLE_CLIENT_SECRET!,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  });
+
+  const data = await response.json();
+  if (data.error) {
+    throw new Error(`Token refresh failed: ${data.error}`);
+  }
+
+  const tokenExpiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+
+  await supabase
+    .from('gmail_channel_configs')
+    .update({ access_token: data.access_token, token_expires_at: tokenExpiresAt })
+    .eq('id', configId);
+
+  return data.access_token;
+}
+
+function buildEmailWithSignature(message: string, settings: any): string {
+  const signature = settings?.signature_html || '';
+  
+  // Convert plain text message to HTML paragraphs
+  const htmlMessage = message
+    .split('\n')
+    .map(line => `<p style="margin: 0 0 10px 0; font-family: Arial, sans-serif; font-size: 14px; color: #333;">${line || '&nbsp;'}</p>`)
+    .join('');
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+    </head>
+    <body style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
+      ${htmlMessage}
+      ${signature ? `<br><br>${signature}` : ''}
+    </body>
+    </html>
+  `;
+}
+
+function buildRawEmail(opts: {
+  to: string;
+  from: string;
+  subject: string;
+  htmlBody: string;
+  textBody: string;
+  threadId?: string | null;
+  inReplyTo?: string;
+}): string {
+  const boundary = `boundary_${Date.now()}`;
+  
+  let headers = [
+    `To: ${opts.to}`,
+    `From: ${opts.from}`,
+    `Subject: ${opts.subject}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+  ];
+
+  if (opts.inReplyTo) {
+    headers.push(`In-Reply-To: <${opts.inReplyTo}>`);
+    headers.push(`References: <${opts.inReplyTo}>`);
+  }
+
+  const email = [
+    headers.join('\r\n'),
+    '',
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    '',
+    opts.textBody,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    '',
+    opts.htmlBody,
+    '',
+    `--${boundary}--`,
+  ].join('\r\n');
+
+  // Base64url encode
+  return btoa(email)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
 serve(async (req) => {
@@ -52,81 +246,87 @@ serve(async (req) => {
     let messageId: string;
     let messageStatus: string;
 
-    // Handle email channel via Postmark
+    // Handle email channel via Gmail API
     if (sendRequest.channel === 'email') {
-      const postmarkApiKey = Deno.env.get('POSTMARK_API_KEY');
-      if (!postmarkApiKey) {
-        throw new Error('Postmark API key not configured');
-      }
+      const result = await sendViaGmail(sendRequest, supabase);
+      if (result.success) {
+        messageId = result.messageId!;
+        messageStatus = 'sent';
+        console.log('Email sent via Gmail:', messageId);
+      } else {
+        // Fallback to Postmark if Gmail not configured
+        const postmarkApiKey = Deno.env.get('POSTMARK_API_KEY');
+        if (!postmarkApiKey) {
+          throw new Error('Email not configured - connect Gmail in settings');
+        }
 
-      // Prepare attachments for Postmark
-      const postmarkAttachments = [];
-      if (sendRequest.attachments && sendRequest.attachments.length > 0) {
-        for (const attachment of sendRequest.attachments) {
-          try {
-            // Download file from storage
-            const { data: fileData, error: downloadError } = await supabase.storage
-              .from('message-attachments')
-              .download(attachment.path);
+        // Prepare attachments for Postmark
+        const postmarkAttachments = [];
+        if (sendRequest.attachments && sendRequest.attachments.length > 0) {
+          for (const attachment of sendRequest.attachments) {
+            try {
+              const { data: fileData, error: downloadError } = await supabase.storage
+                .from('message-attachments')
+                .download(attachment.path);
 
-            if (downloadError) {
-              console.error('Error downloading attachment:', downloadError);
-              continue;
+              if (downloadError) {
+                console.error('Error downloading attachment:', downloadError);
+                continue;
+              }
+
+              const arrayBuffer = await fileData.arrayBuffer();
+              const bytes = new Uint8Array(arrayBuffer);
+              let binary = '';
+              for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+              }
+              const base64 = btoa(binary);
+
+              postmarkAttachments.push({
+                Name: attachment.name,
+                Content: base64,
+                ContentType: attachment.type
+              });
+            } catch (error) {
+              console.error('Error processing attachment for email:', error);
             }
-
-            // Convert to base64
-            const arrayBuffer = await fileData.arrayBuffer();
-            const bytes = new Uint8Array(arrayBuffer);
-            let binary = '';
-            for (let i = 0; i < bytes.length; i++) {
-              binary += String.fromCharCode(bytes[i]);
-            }
-            const base64 = btoa(binary);
-
-            postmarkAttachments.push({
-              Name: attachment.name,
-              Content: base64,
-              ContentType: attachment.type
-            });
-          } catch (error) {
-            console.error('Error processing attachment for email:', error);
           }
         }
+
+        console.log('Sending email via Postmark (fallback)...');
+        const emailBody: any = {
+          From: 'support@bizzybee.io',
+          To: sendRequest.to,
+          Subject: sendRequest.metadata?.subject || 'Re: Your inquiry',
+          TextBody: sendRequest.message,
+          MessageStream: 'outbound',
+        };
+
+        if (postmarkAttachments.length > 0) {
+          emailBody.Attachments = postmarkAttachments;
+        }
+
+        const emailRes = await fetch('https://api.postmarkapp.com/email', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-Postmark-Server-Token': postmarkApiKey,
+          },
+          body: JSON.stringify(emailBody),
+        });
+
+        if (!emailRes.ok) {
+          const errorText = await emailRes.text();
+          console.error('Postmark API error:', emailRes.status, errorText);
+          throw new Error(`Postmark error: ${emailRes.status} - ${errorText}`);
+        }
+
+        const emailResponse = await emailRes.json();
+        messageId = emailResponse.MessageID;
+        messageStatus = 'sent';
+        console.log('Email sent via Postmark:', messageId);
       }
-
-      console.log('Sending email via Postmark...');
-      const emailBody: any = {
-        From: 'support@bizzybee.io',
-        To: sendRequest.to,
-        Subject: sendRequest.metadata?.subject || 'Re: Your inquiry',
-        TextBody: sendRequest.message,
-        MessageStream: 'outbound',
-      };
-
-      if (postmarkAttachments.length > 0) {
-        emailBody.Attachments = postmarkAttachments;
-      }
-
-      const emailRes = await fetch('https://api.postmarkapp.com/email', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-Postmark-Server-Token': postmarkApiKey,
-        },
-        body: JSON.stringify(emailBody),
-      });
-
-      if (!emailRes.ok) {
-        const errorText = await emailRes.text();
-        console.error('Postmark API error:', emailRes.status, errorText);
-        throw new Error(`Postmark error: ${emailRes.status} - ${errorText}`);
-      }
-
-      const emailResponse = await emailRes.json();
-      messageId = emailResponse.MessageID;
-      messageStatus = 'sent';
-      console.log('Email sent via Postmark:', messageId);
     } else {
       // Handle SMS/WhatsApp via Twilio
       let from: string;

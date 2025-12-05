@@ -13,6 +13,7 @@ import { ConversationOrderingPanel } from '@/components/settings/ConversationOrd
 import { KnowledgeBasePanel } from '@/components/settings/KnowledgeBasePanel';
 import { DataSyncPanel } from '@/components/settings/DataSyncPanel';
 import { IntegrationsPanel } from '@/components/settings/IntegrationsPanel';
+import { EmailSettingsPanel } from '@/components/settings/EmailSettingsPanel';
 import { Card } from '@/components/ui/card';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { RecentActivityWidget } from '@/components/dashboard/RecentActivityWidget';
@@ -41,6 +42,7 @@ export default function Settings() {
             <TabsTrigger value="data-sync" className="text-xs md:text-sm">Data Sync</TabsTrigger>
             <TabsTrigger value="integrations" className="text-xs md:text-sm">Integrations</TabsTrigger>
             <TabsTrigger value="channels" className="text-xs md:text-sm">Channels</TabsTrigger>
+            <TabsTrigger value="email-settings" className="text-xs md:text-sm">Email</TabsTrigger>
             <TabsTrigger value="gdpr" className="text-xs md:text-sm">GDPR</TabsTrigger>
             <TabsTrigger value="cleanup" className="text-xs md:text-sm">Cleanup</TabsTrigger>
             <TabsTrigger value="export" className="text-xs md:text-sm">Data Export</TabsTrigger>
