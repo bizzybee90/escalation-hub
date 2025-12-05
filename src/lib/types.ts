@@ -70,6 +70,9 @@ export interface Conversation {
   sla_status: SLAStatus;
   first_response_at: string | null;
   resolved_at: string | null;
+  customer_satisfaction: number | null;
+  csat_requested_at: string | null;
+  csat_responded_at: string | null;
   metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
