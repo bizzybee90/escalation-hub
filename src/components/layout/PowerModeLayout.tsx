@@ -31,8 +31,8 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
       <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0 h-full overflow-hidden">
         {/* Conversation List Panel (hidden on mobile when conversation selected) */}
         <ResizablePanel 
-          defaultSize={20} 
-          minSize={15}
+          defaultSize={22} 
+          minSize={18}
           maxSize={30}
           collapsible={false}
           className={selectedConversation ? "hidden md:flex min-h-0" : "flex min-h-0"}
@@ -51,9 +51,9 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
 
         {/* Conversation Thread Panel (full width on mobile when selected) */}
         <ResizablePanel 
-          defaultSize={55} 
-          minSize={40}
-          maxSize={70}
+          defaultSize={50} 
+          minSize={35}
+          maxSize={60}
           collapsible={false}
           className="w-full min-h-0 flex flex-col h-full min-w-0"
         >
@@ -79,18 +79,18 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
 
         {/* Customer Context Panel (hidden on mobile) */}
         <ResizablePanel 
-          defaultSize={25} 
-          minSize={20}
-          maxSize={30}
+          defaultSize={28} 
+          minSize={22}
+          maxSize={35}
           collapsible={false}
           className="hidden md:flex min-h-0"
         >
-          <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-card/50 p-4 hidden md:flex min-w-0">
+          <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-card/50 p-5 hidden md:flex min-w-0">
             {selectedConversation ? (
               <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm opacity-60">
-                <p className="text-center">Customer details will appear here when you select a conversation</p>
+                <p className="text-center px-4">Customer details will appear here when you select a conversation</p>
               </div>
             )}
           </div>

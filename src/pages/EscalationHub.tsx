@@ -170,8 +170,8 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
         />
         
         {/* Right sidebar - Customer context & actions */}
-        <aside className="w-80 border-l border-border bg-card/50 overflow-y-auto">
-          <div className="p-4 space-y-6">
+        <aside className="w-[340px] min-w-[300px] border-l border-border bg-card/50 overflow-y-auto flex-shrink-0">
+          <div className="p-5 space-y-5">
             <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
             <QuickActions conversation={selectedConversation} onUpdate={handleUpdate} onBack={handleClose} />
           </div>
