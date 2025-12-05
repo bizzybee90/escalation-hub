@@ -62,3 +62,18 @@ verify_jwt = false
 
 [functions.test-integration]
 verify_jwt = false
+
+[functions.gmail-oauth-start]
+verify_jwt = false
+
+[functions.gmail-oauth-callback]
+verify_jwt = false
+
+[functions.gmail-webhook]
+verify_jwt = false
+
+[functions.gmail-sync]
+verify_jwt = false
+
+[functions.gmail-disconnect]
+verify_jwt = false

@@ -530,6 +530,59 @@ export type Database = {
           },
         ]
       }
+      email_settings: {
+        Row: {
+          company_address: string | null
+          company_name: string | null
+          company_phone: string | null
+          company_website: string | null
+          created_at: string | null
+          from_name: string | null
+          id: string
+          logo_url: string | null
+          reply_to_email: string | null
+          signature_html: string | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          company_address?: string | null
+          company_name?: string | null
+          company_phone?: string | null
+          company_website?: string | null
+          created_at?: string | null
+          from_name?: string | null
+          id?: string
+          logo_url?: string | null
+          reply_to_email?: string | null
+          signature_html?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          company_address?: string | null
+          company_name?: string | null
+          company_phone?: string | null
+          company_website?: string | null
+          created_at?: string | null
+          from_name?: string | null
+          id?: string
+          logo_url?: string | null
+          reply_to_email?: string | null
+          signature_html?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       escalated_messages: {
         Row: {
           channel: Database["public"]["Enums"]["message_channel"]
@@ -639,6 +692,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "faq_database_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gmail_channel_configs: {
+        Row: {
+          access_token: string
+          connected_at: string | null
+          created_at: string | null
+          email_address: string
+          history_id: string | null
+          id: string
+          import_mode: string | null
+          last_sync_at: string | null
+          refresh_token: string
+          token_expires_at: string | null
+          updated_at: string | null
+          watch_expiration: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          access_token: string
+          connected_at?: string | null
+          created_at?: string | null
+          email_address: string
+          history_id?: string | null
+          id?: string
+          import_mode?: string | null
+          last_sync_at?: string | null
+          refresh_token: string
+          token_expires_at?: string | null
+          updated_at?: string | null
+          watch_expiration?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          access_token?: string
+          connected_at?: string | null
+          created_at?: string | null
+          email_address?: string
+          history_id?: string | null
+          id?: string
+          import_mode?: string | null
+          last_sync_at?: string | null
+          refresh_token?: string
+          token_expires_at?: string | null
+          updated_at?: string | null
+          watch_expiration?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_channel_configs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
