@@ -22,7 +22,8 @@ interface SidebarProps {
 
 export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, isMobileDrawer = false }: SidebarProps = {}) => {
   const { interfaceMode, toggleMode, loading } = useInterfaceMode();
-  const [collapsed, setCollapsed] = useState(false);
+  // Default to collapsed for a cleaner look
+  const [collapsed, setCollapsed] = useState(true);
   
   const isCollapsed = forceCollapsed || collapsed;
   const [visibleFilters, setVisibleFilters] = useState({
