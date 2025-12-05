@@ -41,7 +41,9 @@ export const TabletQuickActionsPanel = ({
   if (!isOpen) return null;
 
   const handleResolve = async () => {
-    await supabase
+    console.log('Resolving conversation:', conversation.id);
+    
+    const { error } = await supabase
       .from('conversations')
       .update({ 
         status: 'resolved',
@@ -49,6 +51,17 @@ export const TabletQuickActionsPanel = ({
       })
       .eq('id', conversation.id);
     
+    if (error) {
+      console.error('Failed to resolve conversation:', error);
+      toast({ 
+        title: "Failed to resolve", 
+        description: error.message,
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    console.log('Conversation resolved successfully');
     toast({ title: "Conversation resolved" });
     onUpdate();
   };
