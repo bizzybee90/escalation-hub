@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { Upload, Save, Eye, Building2 } from 'lucide-react';
+import { Upload, Save, Eye, Building2, Code } from 'lucide-react';
 
 interface EmailSettings {
   id?: string;
@@ -41,6 +42,8 @@ export function EmailSettingsPanel() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [useCustomHtml, setUseCustomHtml] = useState(false);
+  const [customHtml, setCustomHtml] = useState('');
 
   useEffect(() => {
     if (workspaceId) {
@@ -59,6 +62,10 @@ export function EmailSettingsPanel() {
       if (error) throw error;
       if (data) {
         setSettings(data as EmailSettings);
+        // If there's existing signature_html, load it into custom HTML field
+        if (data.signature_html) {
+          setCustomHtml(data.signature_html);
+        }
       }
     } catch (error) {
       console.error('Error fetching email settings:', error);
@@ -117,11 +124,14 @@ export function EmailSettingsPanel() {
     `.trim();
   };
 
+  const getSignatureHtml = (): string => {
+    return useCustomHtml ? customHtml : generateSignatureHtml();
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Generate signature HTML from settings
-      const signatureHtml = generateSignatureHtml();
+      const signatureHtml = getSignatureHtml();
       const dataToSave = { ...settings, signature_html: signatureHtml, workspace_id: workspaceId };
 
       if (settings.id) {
@@ -159,10 +169,10 @@ export function EmailSettingsPanel() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
-            Company Details
+            Email Settings
           </CardTitle>
           <CardDescription>
-            Configure your company information for email signatures
+            Configure sender information and email signature
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -185,77 +195,121 @@ export function EmailSettingsPanel() {
               />
             </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Company Name</Label>
-              <Input
-                value={settings.company_name}
-                onChange={e => setSettings(prev => ({ ...prev, company_name: e.target.value }))}
-                placeholder="MAC Cleaning Services"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Phone Number</Label>
-              <Input
-                value={settings.company_phone}
-                onChange={e => setSettings(prev => ({ ...prev, company_phone: e.target.value }))}
-                placeholder="+44 123 456 7890"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Website</Label>
-              <Input
-                value={settings.company_website}
-                onChange={e => setSettings(prev => ({ ...prev, company_website: e.target.value }))}
-                placeholder="https://www.company.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Address</Label>
-              <Input
-                value={settings.company_address}
-                onChange={e => setSettings(prev => ({ ...prev, company_address: e.target.value }))}
-                placeholder="123 Main St, London, UK"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Company Logo</Label>
-            <div className="flex items-center gap-4">
-              {settings.logo_url && (
-                <img src={settings.logo_url} alt="Logo" className="h-16 w-auto rounded border" />
-              )}
-              <div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  className="hidden"
-                  id="logo-upload"
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => document.getElementById('logo-upload')?.click()}
-                  disabled={uploading}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  {uploading ? 'Uploading...' : 'Upload Logo'}
-                </Button>
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Email Signature Preview</span>
+            <div className="flex items-center gap-2">
+              <Code className="h-5 w-5" />
+              Email Signature
+            </div>
+            <div className="flex items-center gap-3">
+              <Label htmlFor="custom-html-toggle" className="text-sm font-normal text-muted-foreground">
+                {useCustomHtml ? 'Custom HTML' : 'Builder Mode'}
+              </Label>
+              <Switch
+                id="custom-html-toggle"
+                checked={useCustomHtml}
+                onCheckedChange={setUseCustomHtml}
+              />
+            </div>
+          </CardTitle>
+          <CardDescription>
+            {useCustomHtml 
+              ? 'Paste your custom HTML signature directly' 
+              : 'Fill in your company details to auto-generate a signature'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {useCustomHtml ? (
+            <div className="space-y-2">
+              <Label>Custom HTML Signature</Label>
+              <Textarea
+                value={customHtml}
+                onChange={e => setCustomHtml(e.target.value)}
+                placeholder="<table>...</table>"
+                className="font-mono text-sm min-h-[200px]"
+              />
+              <p className="text-xs text-muted-foreground">
+                Paste your complete HTML signature. Use inline CSS for best email client compatibility.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Company Name</Label>
+                  <Input
+                    value={settings.company_name}
+                    onChange={e => setSettings(prev => ({ ...prev, company_name: e.target.value }))}
+                    placeholder="MAC Cleaning Services"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Phone Number</Label>
+                  <Input
+                    value={settings.company_phone}
+                    onChange={e => setSettings(prev => ({ ...prev, company_phone: e.target.value }))}
+                    placeholder="+44 123 456 7890"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Website</Label>
+                  <Input
+                    value={settings.company_website}
+                    onChange={e => setSettings(prev => ({ ...prev, company_website: e.target.value }))}
+                    placeholder="https://www.company.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Address</Label>
+                  <Input
+                    value={settings.company_address}
+                    onChange={e => setSettings(prev => ({ ...prev, company_address: e.target.value }))}
+                    placeholder="123 Main St, London, UK"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Company Logo</Label>
+                <div className="flex items-center gap-4">
+                  {settings.logo_url && (
+                    <img src={settings.logo_url} alt="Logo" className="h-16 w-auto rounded border" />
+                  )}
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                      id="logo-upload"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => document.getElementById('logo-upload')?.click()}
+                      disabled={uploading}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploading ? 'Uploading...' : 'Upload Logo'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Signature Preview</span>
             <Button variant="ghost" size="sm" onClick={() => setShowPreview(!showPreview)}>
               <Eye className="h-4 w-4 mr-2" />
               {showPreview ? 'Hide' : 'Show'} Preview
@@ -266,7 +320,7 @@ export function EmailSettingsPanel() {
           <CardContent>
             <div 
               className="p-4 bg-muted rounded-lg border"
-              dangerouslySetInnerHTML={{ __html: generateSignatureHtml() }}
+              dangerouslySetInnerHTML={{ __html: getSignatureHtml() }}
             />
           </CardContent>
         )}
