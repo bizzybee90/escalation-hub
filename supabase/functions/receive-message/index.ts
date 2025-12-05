@@ -342,7 +342,7 @@ serve(async (req) => {
         .insert({
           conversation_id: conversationId,
           actor_type: 'ai',
-          actor_name: 'BizzyBee AI',
+          actor_name: 'MAC Cleaning AI',
           body: aiOutput.response,
           channel: normalised.channel,
           direction: 'outbound',
