@@ -17,6 +17,61 @@ interface NormalisedMessage {
   session_id: string;
 }
 
+interface AIOutput {
+  response: string;
+  confidence: number;
+  intent: string;
+  sentiment: string;
+  escalate: boolean;
+  escalation_reason?: string;
+  ai_title: string;
+  ai_summary: string;
+  ai_category: string;
+}
+
+// Validation function for AI responses
+function validateResponse(response: string): { valid: boolean; reason?: string } {
+  // Length check
+  if (!response || response.length < 20) {
+    return { valid: false, reason: `Response too short: ${response?.length || 0} chars (min 20)` };
+  }
+  if (response.length > 500) {
+    return { valid: false, reason: `Response too long: ${response.length} chars (max 500)` };
+  }
+  
+  // Placeholder check - catches [name], [customer], {{variable}}, etc.
+  if (/\[.*?\]|{{.*?}}/.test(response)) {
+    return { valid: false, reason: 'Response contains placeholder text like [name] or {{variable}}' };
+  }
+  
+  // Raw JSON check - catches if AI accidentally included JSON in response
+  if (response.includes('"response":') || response.includes('"escalate":') || response.includes('"confidence":')) {
+    return { valid: false, reason: 'Response contains raw JSON - not a valid customer message' };
+  }
+  
+  // Internal reasoning check - catches AI talking to itself
+  if (/I should|I need to|I will|Let me|I'll respond|The customer|My response/i.test(response.substring(0, 50))) {
+    return { valid: false, reason: 'Response appears to be internal AI reasoning, not a customer message' };
+  }
+  
+  return { valid: true };
+}
+
+// Safe default response when anything goes wrong
+function createSafeEscalationResponse(reason: string, originalMessage: string): AIOutput {
+  return {
+    response: "Thank you for your message. A team member will review this and get back to you shortly.",
+    confidence: 0,
+    intent: "unknown",
+    sentiment: "neutral",
+    escalate: true,
+    escalation_reason: reason,
+    ai_title: "Needs Human Review",
+    ai_summary: originalMessage.substring(0, 100),
+    ai_category: "other"
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -32,19 +87,17 @@ serve(async (req) => {
 
     // Parse incoming request based on content type
     if (contentType.includes('application/x-www-form-urlencoded')) {
-      // Twilio webhook format
       const formData = await req.formData();
       rawBody = Object.fromEntries(formData);
     } else {
-      // JSON format (for testing or web chat)
       rawBody = await req.json();
     }
 
-    console.log('Received webhook:', rawBody);
+    console.log('📥 [receive-message] Incoming webhook:', JSON.stringify(rawBody, null, 2));
 
     // Step 1: Normalise incoming message
     const normalised = normaliseMessage(rawBody);
-    console.log('Normalised message:', normalised);
+    console.log('📥 [receive-message] Normalised:', JSON.stringify(normalised, null, 2));
 
     // Step 2: Find or create customer
     const { data: existingCustomer } = await supabase
@@ -57,9 +110,8 @@ serve(async (req) => {
 
     if (existingCustomer) {
       customerId = existingCustomer.id;
-      console.log('Found existing customer:', customerId);
+      console.log('👤 [receive-message] Found existing customer:', customerId, existingCustomer.name);
     } else {
-      // Get first workspace
       const { data: workspace } = await supabase
         .from('workspaces')
         .select('id')
@@ -68,7 +120,6 @@ serve(async (req) => {
 
       if (!workspace) throw new Error('No workspace found');
 
-      // Create new customer
       const { data: newCustomer, error: customerError } = await supabase
         .from('customers')
         .insert({
@@ -87,7 +138,7 @@ serve(async (req) => {
 
       if (customerError) throw customerError;
       customerId = newCustomer.id;
-      console.log('Created new customer:', customerId);
+      console.log('👤 [receive-message] Created new customer:', customerId);
     }
 
     // Step 3: Find or create conversation
@@ -105,9 +156,8 @@ serve(async (req) => {
 
     if (existingConversation) {
       conversationId = existingConversation.id;
-      console.log('Found existing conversation:', conversationId);
+      console.log('💬 [receive-message] Found existing conversation:', conversationId);
       
-      // Update conversation
       await supabase
         .from('conversations')
         .update({
@@ -116,14 +166,12 @@ serve(async (req) => {
         })
         .eq('id', conversationId);
     } else {
-      // Get workspace id from customer
       const { data: customer } = await supabase
         .from('customers')
         .select('workspace_id')
         .eq('id', customerId)
         .single();
 
-      // Create new conversation
       const { data: newConversation, error: convError } = await supabase
         .from('conversations')
         .insert({
@@ -140,7 +188,7 @@ serve(async (req) => {
 
       if (convError) throw convError;
       conversationId = newConversation.id;
-      console.log('Created new conversation:', conversationId);
+      console.log('💬 [receive-message] Created new conversation:', conversationId);
     }
 
     // Step 4: Log incoming message
@@ -157,6 +205,7 @@ serve(async (req) => {
       });
 
     if (messageError) throw messageError;
+    console.log('📝 [receive-message] Logged inbound message');
 
     // Step 5: Get conversation history for context
     const { data: history } = await supabase
@@ -166,25 +215,65 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(10);
 
-    // Step 6: Call AI agent with tools (uses knowledge base, pricing, FAQs)
-    const aiResponse = await supabase.functions.invoke('claude-ai-agent-tools', {
-      body: {
-        message: normalised,
-        conversation_history: history || [],
-        customer_data: existingCustomer,
-      }
-    });
+    // Step 6: Call AI agent
+    console.log('🤖 [receive-message] Calling AI agent...');
+    
+    let aiOutput: AIOutput;
+    
+    try {
+      const aiResponse = await supabase.functions.invoke('claude-ai-agent-tools', {
+        body: {
+          message: normalised,
+          conversation_history: history || [],
+          customer_data: existingCustomer,
+        }
+      });
 
-    if (aiResponse.error) {
-      console.error('AI agent error:', aiResponse.error);
-      throw new Error('AI agent failed');
+      if (aiResponse.error) {
+        console.error('❌ [receive-message] AI agent invoke error:', aiResponse.error);
+        aiOutput = createSafeEscalationResponse(`AI agent invoke failed: ${aiResponse.error}`, normalised.message_content);
+      } else if (!aiResponse.data) {
+        console.error('❌ [receive-message] AI agent returned no data');
+        aiOutput = createSafeEscalationResponse('AI agent returned no data', normalised.message_content);
+      } else {
+        aiOutput = aiResponse.data as AIOutput;
+        console.log('🤖 [receive-message] AI response received:', JSON.stringify(aiOutput, null, 2));
+      }
+    } catch (aiError) {
+      console.error('❌ [receive-message] AI agent call failed:', aiError);
+      aiOutput = createSafeEscalationResponse(
+        `AI agent exception: ${aiError instanceof Error ? aiError.message : 'unknown'}`,
+        normalised.message_content
+      );
     }
 
-    const aiOutput = aiResponse.data;
-    console.log('AI response:', aiOutput);
+    // Step 7: Validate AI response
+    const validation = validateResponse(aiOutput.response);
+    console.log('✅ [receive-message] Validation result:', JSON.stringify(validation));
+    
+    if (!validation.valid) {
+      console.warn('⚠️ [receive-message] Response validation failed:', validation.reason);
+      aiOutput.escalate = true;
+      aiOutput.escalation_reason = `Validation failed: ${validation.reason}`;
+    }
 
-    // Step 7: Update conversation with AI metadata and tracking
-    // NOTE: AI message is only logged to messages table when actually sent (Step 9)
+    // Step 8: Check confidence threshold
+    if (aiOutput.confidence < 0.5 && !aiOutput.escalate) {
+      console.warn('⚠️ [receive-message] Low confidence, forcing escalation:', aiOutput.confidence);
+      aiOutput.escalate = true;
+      aiOutput.escalation_reason = `Low confidence: ${aiOutput.confidence}`;
+    }
+
+    // Step 9: Final decision logging
+    console.log('📊 [receive-message] Final decision:', {
+      willSend: !aiOutput.escalate,
+      escalate: aiOutput.escalate,
+      escalation_reason: aiOutput.escalation_reason || null,
+      confidence: aiOutput.confidence,
+      responsePreview: aiOutput.response.substring(0, 80) + '...',
+    });
+
+    // Step 10: Update conversation with AI metadata
     const updateData: any = {
       ai_confidence: aiOutput.confidence,
       ai_sentiment: aiOutput.sentiment,
@@ -192,28 +281,32 @@ serve(async (req) => {
       title: aiOutput.ai_title,
       summary_for_human: aiOutput.ai_summary,
       updated_at: new Date().toISOString(),
-      // AI/Human tracking
       ai_draft_response: aiOutput.response,
-      final_response: aiOutput.response,
-      auto_responded: !aiOutput.escalate,
       mode: 'ai',
       confidence: aiOutput.confidence,
-      human_edited: false,
     };
 
     if (aiOutput.escalate) {
+      // ESCALATED: Save draft but don't send
       updateData.is_escalated = true;
       updateData.escalated_at = new Date().toISOString();
       updateData.ai_reason_for_escalation = aiOutput.escalation_reason;
-      updateData.status = 'escalated'; // Set to 'escalated' so it appears in escalation filters
+      updateData.status = 'escalated';
       updateData.conversation_type = 'escalated';
       updateData.auto_responded = false;
+      updateData.human_edited = false;
+      // DO NOT set final_response for escalated - human will provide it
       
-      console.log('Escalating conversation:', conversationId);
+      console.log('🚨 [receive-message] ESCALATING conversation:', conversationId);
+      console.log('🚨 [receive-message] Reason:', aiOutput.escalation_reason);
     } else {
+      // AI HANDLED: Will send response
       updateData.ai_message_count = (existingConversation?.ai_message_count || 0) + 1;
       updateData.conversation_type = 'ai_handled';
       updateData.status = 'ai_handling';
+      updateData.auto_responded = true;
+      updateData.final_response = aiOutput.response;
+      updateData.human_edited = false;
     }
 
     await supabase
@@ -221,28 +314,17 @@ serve(async (req) => {
       .update(updateData)
       .eq('id', conversationId);
 
-    // Step 8b: Generate embedding for the conversation (background task)
+    // Step 11: Generate embedding in background
     const conversationText = `${normalised.message_content} ${aiOutput.response}`;
-    
-    // Start embedding generation in background (don't await)
     supabase.functions.invoke('generate-embedding', {
-      body: {
-        text: conversationText,
-        conversationId: conversationId
-      }
-    }).then(result => {
-      if (result.error) {
-        console.error('Failed to generate embedding:', result.error);
-      } else {
-        console.log('Embedding generated successfully for conversation:', conversationId);
-      }
-    });
+      body: { text: conversationText, conversationId: conversationId }
+    }).catch(err => console.error('Embedding generation failed:', err));
 
-    // Step 9: Send response if not escalated
+    // Step 12: Send response ONLY if not escalated
     if (!aiOutput.escalate) {
-      console.log('Sending automated response');
+      console.log('📤 [receive-message] Sending automated response...');
       
-      // Log AI response message ONLY when actually sending
+      // Log AI message ONLY when actually sending
       await supabase
         .from('messages')
         .insert({
@@ -264,23 +346,25 @@ serve(async (req) => {
       });
 
       if (sendResponse.error) {
-        console.error('Send response error:', sendResponse.error);
+        console.error('❌ [receive-message] Send response error:', sendResponse.error);
+      } else {
+        console.log('✅ [receive-message] Response sent successfully');
       }
     } else {
-      console.log('Conversation escalated - AI draft saved but not sent or logged as message');
+      console.log('🚫 [receive-message] NOT sending - escalated to human');
     }
 
     return new Response(JSON.stringify({
       success: true,
       conversation_id: conversationId,
       escalated: aiOutput.escalate,
-      response: aiOutput.response,
+      escalation_reason: aiOutput.escalation_reason || null,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
-    console.error('Error in receive-message:', error);
+    console.error('❌ [receive-message] Fatal error:', error);
     return new Response(JSON.stringify({
       error: error.message,
       success: false
