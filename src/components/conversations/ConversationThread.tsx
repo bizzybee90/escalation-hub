@@ -116,46 +116,71 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
     }
 
     // For external messages, send via Twilio/Postmark
-    if (!isInternal && conversation.customer) {
+    if (!isInternal) {
       try {
-        // Determine recipient based on channel
-        let recipient = '';
-        if (conversation.channel === 'email') {
-          recipient = conversation.customer.email || '';
-        } else if (conversation.channel === 'sms' || conversation.channel === 'whatsapp') {
-          recipient = conversation.customer.phone || '';
+        // Fetch customer data if not available on conversation
+        let customer = conversation.customer;
+        if (!customer && conversation.customer_id) {
+          const { data: customerData } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', conversation.customer_id)
+            .single();
+          customer = customerData as typeof conversation.customer;
         }
 
-        if (recipient) {
-          console.log('📤 Sending message via edge function:', { channel: conversation.channel, recipient });
-          
-          const { data: sendResult, error: sendError } = await supabase.functions.invoke('send-response', {
-            body: {
-              conversationId: conversation.id,
-              channel: conversation.channel,
-              to: recipient,
-              message: body,
-              skipMessageLog: true, // We already saved the message above
-              metadata: {
-                actorType: 'human_agent',
-                actorName: userData?.name || 'Agent',
-                actorId: user.id
-              }
-            }
-          });
+        if (customer) {
+          // Determine recipient based on channel
+          let recipient = '';
+          if (conversation.channel === 'email') {
+            recipient = customer.email || '';
+          } else if (conversation.channel === 'sms' || conversation.channel === 'whatsapp') {
+            recipient = customer.phone || '';
+          }
 
-          if (sendError) {
-            console.error('Error sending via channel:', sendError);
+          if (recipient) {
+            console.log('📤 Sending message via edge function:', { channel: conversation.channel, recipient });
+            
+            const { data: sendResult, error: sendError } = await supabase.functions.invoke('send-response', {
+              body: {
+                conversationId: conversation.id,
+                channel: conversation.channel,
+                to: recipient,
+                message: body,
+                skipMessageLog: true, // We already saved the message above
+                metadata: {
+                  actorType: 'human_agent',
+                  actorName: userData?.name || 'Agent',
+                  actorId: user.id
+                }
+              }
+            });
+
+            if (sendError) {
+              console.error('Error sending via channel:', sendError);
+              toast({
+                title: "Warning",
+                description: `Message saved but delivery failed: ${sendError.message}`,
+                variant: "destructive"
+              });
+            } else {
+              console.log('✅ Message sent successfully:', sendResult);
+            }
+          } else {
+            console.warn('No recipient found for channel:', conversation.channel);
             toast({
               title: "Warning",
-              description: `Message saved but delivery failed: ${sendError.message}`,
+              description: "Message saved but no recipient contact info found",
               variant: "destructive"
             });
-          } else {
-            console.log('✅ Message sent successfully:', sendResult);
           }
         } else {
-          console.warn('No recipient found for channel:', conversation.channel);
+          console.warn('No customer found for conversation');
+          toast({
+            title: "Warning",
+            description: "Message saved but customer not found for delivery",
+            variant: "destructive"
+          });
         }
       } catch (error: any) {
         console.error('Error calling send-response:', error);
