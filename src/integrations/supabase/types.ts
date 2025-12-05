@@ -108,6 +108,8 @@ export type Database = {
           confidence: number | null
           conversation_type: string | null
           created_at: string | null
+          csat_requested_at: string | null
+          csat_responded_at: string | null
           customer_id: string | null
           customer_satisfaction: number | null
           embedding: string | null
@@ -149,6 +151,8 @@ export type Database = {
           confidence?: number | null
           conversation_type?: string | null
           created_at?: string | null
+          csat_requested_at?: string | null
+          csat_responded_at?: string | null
           customer_id?: string | null
           customer_satisfaction?: number | null
           embedding?: string | null
@@ -190,6 +194,8 @@ export type Database = {
           confidence?: number | null
           conversation_type?: string | null
           created_at?: string | null
+          csat_requested_at?: string | null
+          csat_responded_at?: string | null
           customer_id?: string | null
           customer_satisfaction?: number | null
           embedding?: string | null

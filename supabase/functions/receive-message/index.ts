@@ -72,6 +72,26 @@ function createSafeEscalationResponse(reason: string, originalMessage: string): 
   };
 }
 
+// Check if message is a CSAT response (single digit 1-5)
+function isCSATResponse(message: string): number | null {
+  const trimmed = message.trim();
+  // Check for single digit 1-5, optionally with punctuation
+  const match = trimmed.match(/^([1-5])[\.\!\?]?$/);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  // Also check for spelled out numbers
+  const wordMap: Record<string, number> = {
+    'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+    '1': 1, '2': 2, '3': 3, '4': 4, '5': 5
+  };
+  const lower = trimmed.toLowerCase();
+  if (wordMap[lower]) {
+    return wordMap[lower];
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -99,7 +119,115 @@ serve(async (req) => {
     const normalised = normaliseMessage(rawBody);
     console.log('📥 [receive-message] Normalised:', JSON.stringify(normalised, null, 2));
 
-    // Step 2: Find or create customer
+    // Step 2: Check if this is a CSAT response
+    const csatRating = isCSATResponse(normalised.message_content);
+    
+    if (csatRating !== null) {
+      console.log(`⭐ [receive-message] Detected CSAT response: ${csatRating}`);
+      
+      // Find a recent conversation with CSAT requested but not responded
+      const { data: csatConversation } = await supabase
+        .from('conversations')
+        .select('id, channel, customer_id')
+        .or(`channel.eq.${normalised.channel}`)
+        .not('csat_requested_at', 'is', null)
+        .is('csat_responded_at', null)
+        .is('customer_satisfaction', null)
+        .order('csat_requested_at', { ascending: false })
+        .limit(10);
+
+      // Find the conversation that matches this customer
+      let matchedConversation = null;
+      
+      if (csatConversation && csatConversation.length > 0) {
+        for (const conv of csatConversation) {
+          const { data: customer } = await supabase
+            .from('customers')
+            .select('phone, email')
+            .eq('id', conv.customer_id)
+            .single();
+          
+          if (customer) {
+            const customerIdentifier = normalised.channel === 'email' 
+              ? customer.email 
+              : customer.phone;
+            
+            if (customerIdentifier === normalised.customer_identifier) {
+              matchedConversation = conv;
+              break;
+            }
+          }
+        }
+      }
+
+      if (matchedConversation) {
+        console.log(`✅ [receive-message] Found matching CSAT conversation: ${matchedConversation.id}`);
+        
+        // Update conversation with CSAT rating
+        await supabase
+          .from('conversations')
+          .update({
+            customer_satisfaction: csatRating,
+            csat_responded_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', matchedConversation.id);
+
+        // Log the CSAT response as a message
+        await supabase
+          .from('messages')
+          .insert({
+            conversation_id: matchedConversation.id,
+            actor_type: 'customer',
+            actor_name: 'Customer',
+            body: normalised.message_content,
+            channel: normalised.channel,
+            direction: 'inbound',
+            raw_payload: rawBody,
+          });
+
+        // Send thank you message
+        const thankYouMessage = csatRating >= 4
+          ? "Thank you for the great feedback! We're glad we could help. 😊"
+          : "Thank you for your feedback. We're always working to improve our service.";
+
+        await supabase.functions.invoke('send-response', {
+          body: {
+            conversationId: matchedConversation.id,
+            channel: normalised.channel,
+            to: normalised.customer_identifier,
+            message: thankYouMessage,
+          }
+        });
+
+        // Log the thank you message
+        await supabase
+          .from('messages')
+          .insert({
+            conversation_id: matchedConversation.id,
+            actor_type: 'system',
+            actor_name: 'CSAT System',
+            body: thankYouMessage,
+            channel: normalised.channel,
+            direction: 'outbound',
+          });
+
+        console.log(`⭐ [receive-message] CSAT rating ${csatRating} recorded for conversation ${matchedConversation.id}`);
+
+        return new Response(JSON.stringify({
+          success: true,
+          type: 'csat_response',
+          conversation_id: matchedConversation.id,
+          rating: csatRating,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } else {
+        console.log('⚠️ [receive-message] CSAT response received but no matching conversation found, processing as regular message');
+      }
+    }
+
+    // Step 3: Find or create customer (regular message flow)
     const { data: existingCustomer } = await supabase
       .from('customers')
       .select('*')
@@ -141,7 +269,7 @@ serve(async (req) => {
       console.log('👤 [receive-message] Created new customer:', customerId);
     }
 
-    // Step 3: Find or create conversation
+    // Step 4: Find or create conversation
     const { data: existingConversation } = await supabase
       .from('conversations')
       .select('*')
@@ -193,7 +321,7 @@ serve(async (req) => {
       console.log('💬 [receive-message] Created new conversation:', conversationId);
     }
 
-    // Step 4: Log incoming message
+    // Step 5: Log incoming message
     const { error: messageError } = await supabase
       .from('messages')
       .insert({
@@ -209,7 +337,7 @@ serve(async (req) => {
     if (messageError) throw messageError;
     console.log('📝 [receive-message] Logged inbound message');
 
-    // Step 5: Get conversation history for context
+    // Step 6: Get conversation history for context
     const { data: history } = await supabase
       .from('messages')
       .select('*')
@@ -217,7 +345,7 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(10);
 
-    // Step 6: Call AI agent
+    // Step 7: Call AI agent
     console.log('🤖 [receive-message] Calling AI agent...');
     
     let aiOutput: AIOutput;
@@ -261,7 +389,7 @@ serve(async (req) => {
       );
     }
 
-    // Step 7: Validate AI response
+    // Step 8: Validate AI response
     const validation = validateResponse(aiOutput.response);
     console.log('✅ [receive-message] Validation result:', JSON.stringify(validation));
     
@@ -271,14 +399,14 @@ serve(async (req) => {
       aiOutput.escalation_reason = `Validation failed: ${validation.reason}`;
     }
 
-    // Step 8: Check confidence threshold
+    // Step 9: Check confidence threshold
     if (aiOutput.confidence < 0.5 && !aiOutput.escalate) {
       console.warn('⚠️ [receive-message] Low confidence, forcing escalation:', aiOutput.confidence);
       aiOutput.escalate = true;
       aiOutput.escalation_reason = `Low confidence: ${aiOutput.confidence}`;
     }
 
-    // Step 9: Final decision logging
+    // Step 10: Final decision logging
     console.log('📊 [receive-message] Final decision:', {
       willSend: !aiOutput.escalate,
       escalate: aiOutput.escalate,
@@ -287,7 +415,7 @@ serve(async (req) => {
       responsePreview: aiOutput.response.substring(0, 80) + '...',
     });
 
-    // Step 10: Update conversation with AI metadata
+    // Step 11: Update conversation with AI metadata
     const updateData: any = {
       ai_confidence: aiOutput.confidence,
       ai_sentiment: aiOutput.sentiment,
@@ -336,13 +464,13 @@ serve(async (req) => {
       .update(updateData)
       .eq('id', conversationId);
 
-    // Step 11: Generate embedding in background
+    // Step 12: Generate embedding in background
     const conversationText = `${normalised.message_content} ${aiOutput.response}`;
     supabase.functions.invoke('generate-embedding', {
       body: { text: conversationText, conversationId: conversationId }
     }).catch(err => console.error('Embedding generation failed:', err));
 
-    // Step 12: Send response ONLY if not escalated AND not a customer reply to waiting conversation
+    // Step 13: Send response ONLY if not escalated AND not a customer reply to waiting conversation
     if (!aiOutput.escalate && !wasWaitingForCustomer) {
       console.log('📤 [receive-message] Sending automated response...');
       

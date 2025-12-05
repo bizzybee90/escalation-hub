@@ -35,3 +35,30 @@ verify_jwt = false
 
 [functions.sync-external-data]
 verify_jwt = false
+
+[functions.send-csat-request]
+verify_jwt = false
+
+[functions.check-consent]
+verify_jwt = false
+
+[functions.create-consent]
+verify_jwt = false
+
+[functions.export-customer-data]
+verify_jwt = false
+
+[functions.request-deletion]
+verify_jwt = false
+
+[functions.cleanup-old-data]
+verify_jwt = false
+
+[functions.merge-duplicate-customers]
+verify_jwt = false
+
+[functions.merge-duplicate-conversations]
+verify_jwt = false
+
+[functions.test-integration]
+verify_jwt = false
