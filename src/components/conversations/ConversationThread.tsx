@@ -117,26 +117,43 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
 
     // For external messages, send via Twilio/Postmark
     if (!isInternal) {
+      console.log('🔄 Processing external message for delivery...');
       try {
         // Fetch customer data if not available on conversation
         let customer = conversation.customer;
+        console.log('👤 Customer from conversation:', customer);
+        console.log('🆔 Customer ID:', conversation.customer_id);
+        
         if (!customer && conversation.customer_id) {
-          const { data: customerData } = await supabase
+          console.log('📡 Fetching customer data from database...');
+          const { data: customerData, error: customerError } = await supabase
             .from('customers')
             .select('*')
             .eq('id', conversation.customer_id)
             .single();
-          customer = customerData as typeof conversation.customer;
+          
+          if (customerError) {
+            console.error('❌ Error fetching customer:', customerError);
+          } else {
+            console.log('✅ Customer data fetched:', customerData);
+            customer = customerData as typeof conversation.customer;
+          }
         }
 
         if (customer) {
           // Determine recipient based on channel
           let recipient = '';
+          console.log('📞 Channel:', conversation.channel);
+          console.log('📧 Customer email:', customer.email);
+          console.log('📱 Customer phone:', customer.phone);
+          
           if (conversation.channel === 'email') {
             recipient = customer.email || '';
           } else if (conversation.channel === 'sms' || conversation.channel === 'whatsapp') {
             recipient = customer.phone || '';
           }
+
+          console.log('📬 Determined recipient:', recipient);
 
           if (recipient) {
             console.log('📤 Sending message via edge function:', { channel: conversation.channel, recipient });
