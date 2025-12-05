@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { BackButton } from '@/components/shared/BackButton';
 
 export default function WebhookLogs() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -51,7 +52,8 @@ export default function WebhookLogs() {
     <div className="container mx-auto py-4 md:py-6 px-4 max-w-7xl">
       <div className="mb-4 md:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Webhook Logs</h1>
+          <BackButton to="/" label="Back to Dashboard" />
+          <h1 className="text-2xl md:text-3xl font-bold mt-2">Webhook Logs</h1>
           <p className="text-sm text-muted-foreground mt-1 md:mt-2">Monitor n8n webhook communications</p>
         </div>
         <Button onClick={loadLogs} disabled={loading} size="sm" className="self-start sm:self-auto">
