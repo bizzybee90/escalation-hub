@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Conversation, Message } from '@/lib/types';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AIContextPanel } from '@/components/conversations/AIContextPanel';
@@ -188,6 +189,21 @@ export const MobileConversationView = ({
   };
 
   const isOverdue = conversation.sla_due_at && new Date(conversation.sla_due_at) < new Date();
+  const location = useLocation();
+  
+  const getListName = (pathname: string): string => {
+    if (pathname.includes('my-tickets')) return 'My Tickets';
+    if (pathname.includes('unassigned')) return 'Unassigned';
+    if (pathname.includes('all-open')) return 'All Open';
+    if (pathname.includes('escalations')) return 'Escalations';
+    if (pathname.includes('awaiting')) return 'Awaiting Reply';
+    if (pathname.includes('completed')) return 'Completed';
+    if (pathname.includes('channel')) return 'Channels';
+    return 'Conversations';
+  };
+  
+  const listName = getListName(location.pathname);
+  
   const getSentimentEmoji = (sentiment: string | null) => {
     switch (sentiment) {
       case 'positive': return '😊';
@@ -202,9 +218,16 @@ export const MobileConversationView = ({
       {/* iOS-Style Header */}
       <div className="flex-shrink-0 bg-background/95 backdrop-blur-sm border-b border-border/40 sticky top-0 z-30 animate-fade-in">
         <div className="flex items-center justify-between px-4 h-14">
-          <h1 className="flex-1 font-medium text-base truncate">
-            {conversation.title || 'Conversation'}
-          </h1>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="flex-shrink-0 gap-1 text-muted-foreground hover:text-foreground -ml-2"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back to {listName}</span>
+            <span className="sm:hidden">Back</span>
+          </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -224,6 +247,13 @@ export const MobileConversationView = ({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
+
+        {/* Conversation title */}
+        <div className="px-4 pb-1">
+          <h1 className="font-medium text-base truncate">
+            {conversation.title || 'Conversation'}
+          </h1>
         </div>
 
         {/* Status badges below header */}
