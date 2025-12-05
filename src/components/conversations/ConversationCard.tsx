@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Conversation } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass } from 'lucide-react';
+import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass, Star } from 'lucide-react';
 import { ChannelIcon } from '../shared/ChannelIcon';
 import { cn } from '@/lib/utils';
 import { useIsTablet } from '@/hooks/use-tablet';
@@ -341,6 +341,13 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
                 Unassigned
               </Badge>
             )}
+
+            {conversation.customer_satisfaction && (
+              <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20 flex items-center gap-1.5">
+                <Star className="h-3 w-3 fill-current" />
+                {conversation.customer_satisfaction}/5
+              </Badge>
+            )}
           </div>
 
           {/* Meta Row */}
@@ -444,6 +451,13 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
           ) : (
             <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 text-amber-600 border-amber-500/20 flex items-center gap-1.5">
               Unassigned
+            </Badge>
+          )}
+
+          {conversation.customer_satisfaction && (
+            <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20 flex items-center gap-1.5">
+              <Star className="h-3 w-3 fill-current" />
+              {conversation.customer_satisfaction}/5
             </Badge>
           )}
         </div>
