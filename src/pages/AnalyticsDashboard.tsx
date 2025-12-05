@@ -14,6 +14,7 @@ import {
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
+import { BackButton } from '@/components/shared/BackButton';
 
 type TimeRange = 'today' | '7days' | '30days';
 
@@ -215,7 +216,8 @@ export default function AnalyticsDashboard() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Analytics Dashboard</h1>
+            <BackButton to="/" label="Back to Dashboard" />
+            <h1 className="text-2xl font-bold mt-2">Analytics Dashboard</h1>
             <p className="text-muted-foreground">AI performance and conversation insights</p>
           </div>
           <div className="flex gap-2">

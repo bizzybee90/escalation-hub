@@ -18,12 +18,14 @@ import { Card } from '@/components/ui/card';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { RecentActivityWidget } from '@/components/dashboard/RecentActivityWidget';
 import { TestTube } from 'lucide-react';
+import { BackButton } from '@/components/shared/BackButton';
 
 export default function Settings() {
   return (
     <div className="container mx-auto py-4 md:py-6 px-4 max-w-6xl">
       <div className="mb-4 md:mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
+        <BackButton to="/" label="Back to Dashboard" />
+        <h1 className="text-2xl md:text-3xl font-bold mt-2">Settings</h1>
         <p className="text-sm md:text-base text-muted-foreground mt-1 md:mt-2">Manage your workspace settings, GDPR compliance, and data policies.</p>
       </div>
 
