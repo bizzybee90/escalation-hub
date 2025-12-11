@@ -27,8 +27,15 @@ serve(async (req) => {
     // Build OAuth URL
     const redirectUri = `${SUPABASE_URL}/functions/v1/gmail-oauth-callback`;
     
-    // Use full Gmail access scope to match Google Cloud Console configuration
-    const scopes = 'https://mail.google.com/';
+    // Use standard Gmail API scopes (not restricted)
+    const scopes = [
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/gmail.send',
+      'https://www.googleapis.com/auth/gmail.modify',
+      'openid',
+      'email',
+      'profile'
+    ].join(' ');
 
     // State contains workspaceId for callback
     const state = btoa(JSON.stringify({ workspaceId }));
