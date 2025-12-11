@@ -27,8 +27,15 @@ serve(async (req) => {
     // Build OAuth URL
     const redirectUri = `${SUPABASE_URL}/functions/v1/gmail-oauth-callback`;
     
-    // DIAGNOSTIC TEST: Using only basic scopes to isolate 403 cause
-    const scopes = 'openid email profile';
+    // Gmail API scopes for reading, sending, and modifying emails
+    const scopes = [
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/gmail.send',
+      'https://www.googleapis.com/auth/gmail.modify',
+      'openid',
+      'email',
+      'profile'
+    ].join(' ');
 
     // State contains workspaceId for callback
     const state = btoa(JSON.stringify({ workspaceId }));
