@@ -117,24 +117,35 @@ serve(async (req) => {
         }
 
         const message = await fullMessageResponse.json();
-        console.log('Full message fetched, has textBody:', !!message.textBody, 'has htmlBody:', !!message.htmlBody, 'has body:', !!message.body);
+        console.log('Full message fetched:', JSON.stringify({
+          hasTextBody: !!message.textBody,
+          hasHtmlBody: !!message.htmlBody,
+          hasBody: !!message.body,
+          bodyType: typeof message.body,
+          bodyKeys: message.body ? Object.keys(message.body) : [],
+        }));
 
         // Extract email details - check multiple possible field names
-        const fromEmail = message.from?.email?.toLowerCase() || message.sender?.email?.toLowerCase() || '';
+        const fromEmail = (message.from?.email || message.sender?.email || '').toLowerCase();
         const fromName = message.from?.name || message.sender?.name || fromEmail.split('@')[0];
         const subject = message.subject || 'No Subject';
         
-        // Try multiple fields for body content
-        let body = message.textBody || message.text || message.body?.text || '';
-        if (!body && message.htmlBody) {
-          // Strip HTML tags as fallback
+        // Try multiple fields for body content - Aurinko uses nested body object
+        let body = '';
+        if (message.textBody) {
+          body = message.textBody;
+        } else if (message.body && typeof message.body === 'object') {
+          // Aurinko returns body as { text: "...", html: "..." }
+          body = message.body.text || message.body.plain || '';
+          if (!body && message.body.html) {
+            body = message.body.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          }
+        } else if (message.htmlBody) {
           body = message.htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-        }
-        if (!body && message.body?.html) {
-          body = message.body.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-        }
-        if (!body && message.snippet) {
+        } else if (message.snippet) {
           body = message.snippet;
+        } else if (typeof message.body === 'string') {
+          body = message.body;
         }
         
         console.log('Extracted body length:', body.length, 'preview:', body.substring(0, 100));
@@ -178,8 +189,19 @@ serve(async (req) => {
           customer = newCustomer;
         }
 
-        // Get original recipient (to address)
-        const toAddresses = message.to?.map((t: any) => (t.email || t).toLowerCase()) || [];
+        // Get original recipient (to address) - safely extract email
+        const toAddresses: string[] = [];
+        if (Array.isArray(message.to)) {
+          for (const t of message.to) {
+            if (typeof t === 'string') {
+              toAddresses.push(t.toLowerCase());
+            } else if (t && typeof t.email === 'string') {
+              toAddresses.push(t.email.toLowerCase());
+            } else if (t && typeof t.address === 'string') {
+              toAddresses.push(t.address.toLowerCase());
+            }
+          }
+        }
         const originalRecipient = toAddresses.find((addr: string) => allConnectedEmails.includes(addr)) || config.email_address;
 
         // Create conversation
