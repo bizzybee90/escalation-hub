@@ -130,6 +130,22 @@ serve(async (req) => {
         const fromName = message.from?.name || message.sender?.name || fromEmail.split('@')[0];
         const subject = message.subject || 'No Subject';
         
+        // Helper to strip HTML and clean up text
+        const stripHtml = (html: string): string => {
+          return html
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style blocks
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script blocks
+            .replace(/<[^>]+>/g, ' ') // Remove HTML tags
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/\s+/g, ' ')
+            .trim();
+        };
+
         // Try multiple fields for body content - Aurinko uses nested body object
         let body = '';
         if (message.textBody) {
@@ -138,14 +154,19 @@ serve(async (req) => {
           // Aurinko returns body as { text: "...", html: "..." }
           body = message.body.text || message.body.plain || '';
           if (!body && message.body.html) {
-            body = message.body.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            body = stripHtml(message.body.html);
           }
         } else if (message.htmlBody) {
-          body = message.htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          body = stripHtml(message.htmlBody);
         } else if (message.snippet) {
           body = message.snippet;
         } else if (typeof message.body === 'string') {
-          body = message.body;
+          // Check if it looks like HTML
+          if (message.body.includes('<') && message.body.includes('>')) {
+            body = stripHtml(message.body);
+          } else {
+            body = message.body;
+          }
         }
         
         console.log('Extracted body length:', body.length, 'preview:', body.substring(0, 100));
