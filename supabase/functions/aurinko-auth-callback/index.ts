@@ -64,10 +64,10 @@ const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string
 </body>
 </html>`;
 
-const htmlHeaders = new Headers({
+const htmlHeaders = {
   'Content-Type': 'text/html; charset=utf-8',
   'Cache-Control': 'no-cache, no-store, must-revalidate',
-});
+};
 
 serve(async (req) => {
   try {
