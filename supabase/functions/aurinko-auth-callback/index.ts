@@ -164,34 +164,36 @@ serve(async (req) => {
     
     console.log('Final email address:', emailAddress);
 
-    // Auto-fetch aliases from Gmail sendAs API (for Gmail accounts)
+    // Auto-fetch aliases from Aurinko's email settings endpoint
     let aliases: string[] = [];
-    if (provider === 'Google' && tokenData.accessToken) {
+    if (tokenData.accessToken) {
       try {
-        const sendAsResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs', {
+        // For Google accounts, try to get sendAs aliases via Gmail API through Aurinko proxy
+        // or use Aurinko's email settings endpoint
+        const settingsResponse = await fetch('https://api.aurinko.io/v1/email/settings', {
           headers: {
             'Authorization': `Bearer ${tokenData.accessToken}`,
           },
         });
 
-        if (sendAsResponse.ok) {
-          const sendAsData = await sendAsResponse.json();
-          console.log('Gmail sendAs data:', JSON.stringify(sendAsData));
+        if (settingsResponse.ok) {
+          const settingsData = await settingsResponse.json();
+          console.log('Email settings data:', JSON.stringify(settingsData));
           
-          // Extract aliases (exclude the primary email)
-          if (sendAsData.sendAs && Array.isArray(sendAsData.sendAs)) {
-            aliases = sendAsData.sendAs
-              .map((sa: any) => sa.sendAsEmail?.toLowerCase())
+          // Extract sendAs aliases if available
+          if (settingsData.sendAsEmails && Array.isArray(settingsData.sendAsEmails)) {
+            aliases = settingsData.sendAsEmails
+              .map((email: string) => email?.toLowerCase())
               .filter((email: string) => email && email !== emailAddress.toLowerCase());
           }
-          console.log('Auto-detected aliases:', aliases);
         } else {
-          console.log('Gmail sendAs fetch failed:', sendAsResponse.status);
+          console.log('Email settings fetch failed:', settingsResponse.status, await settingsResponse.text());
         }
       } catch (e) {
-        console.log('Failed to fetch Gmail aliases:', e);
+        console.log('Failed to fetch email settings:', e);
       }
     }
+    console.log('Auto-detected aliases:', aliases);
 
     // Store in database
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);

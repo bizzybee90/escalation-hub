@@ -44,8 +44,8 @@ serve(async (req) => {
     }));
 
     // Aurinko OAuth authorize URL
-    // Using minimal scopes for email access
-    const scopes = 'Mail.Read Mail.Send Mail.ReadWrite';
+    // Request scopes including Gmail settings for alias detection
+    const scopes = 'Mail.Read Mail.Send Mail.ReadWrite MailboxSettings';
     
     const authUrl = new URL('https://api.aurinko.io/v1/auth/authorize');
     authUrl.searchParams.set('clientId', AURINKO_CLIENT_ID);
