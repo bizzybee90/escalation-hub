@@ -1,8 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string) => `
-<!DOCTYPE html>
+const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string) => `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -63,8 +62,12 @@ const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string
     ${type === 'success' ? "setTimeout(() => window.close(), 2000);" : ""}
   </script>
 </body>
-</html>
-`;
+</html>`;
+
+const htmlHeaders = new Headers({
+  'Content-Type': 'text/html; charset=utf-8',
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+});
 
 serve(async (req) => {
   try {
@@ -78,22 +81,22 @@ serve(async (req) => {
     // Handle cancellation scenarios
     if (error === 'access_denied' || error === 'user_cancelled' || error === 'consent_required') {
       console.log('User cancelled OAuth flow:', error);
-      return new Response(getStyledHTML('cancelled'), { headers: { 'Content-Type': 'text/html' } });
+      return new Response(getStyledHTML('cancelled'), { headers: htmlHeaders });
     }
 
     // If no code and no explicit error, treat as cancellation
     if (!code) {
       console.log('No code provided, treating as cancellation');
-      return new Response(getStyledHTML('cancelled'), { headers: { 'Content-Type': 'text/html' } });
+      return new Response(getStyledHTML('cancelled'), { headers: htmlHeaders });
     }
 
     if (error) {
       console.error('Aurinko auth error:', error);
-      return new Response(getStyledHTML('error', error), { headers: { 'Content-Type': 'text/html' } });
+      return new Response(getStyledHTML('error', error), { headers: htmlHeaders });
     }
 
     if (!state) {
-      return new Response(getStyledHTML('error', 'Missing state parameter'), { headers: { 'Content-Type': 'text/html' } });
+      return new Response(getStyledHTML('error', 'Missing state parameter'), { headers: htmlHeaders });
     }
 
     // Decode state
@@ -101,7 +104,7 @@ serve(async (req) => {
     try {
       stateData = JSON.parse(atob(state));
     } catch (e) {
-      return new Response(getStyledHTML('error', 'Invalid state parameter'), { headers: { 'Content-Type': 'text/html' } });
+      return new Response(getStyledHTML('error', 'Invalid state parameter'), { headers: htmlHeaders });
     }
 
     const { workspaceId, importMode, provider } = stateData;
@@ -113,7 +116,7 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!AURINKO_CLIENT_ID || !AURINKO_CLIENT_SECRET) {
-      return new Response(getStyledHTML('error', 'Aurinko credentials not configured'), { headers: { 'Content-Type': 'text/html' } });
+      return new Response(getStyledHTML('error', 'Aurinko credentials not configured'), { headers: htmlHeaders });
     }
 
     // Exchange code for access token
@@ -128,7 +131,7 @@ serve(async (req) => {
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('Token exchange failed:', errorText);
-      return new Response(getStyledHTML('error', 'Failed to exchange authorization code. Please try again.'), { headers: { 'Content-Type': 'text/html' } });
+      return new Response(getStyledHTML('error', 'Failed to exchange authorization code. Please try again.'), { headers: htmlHeaders });
     }
 
     const tokenData = await tokenResponse.json();
@@ -167,16 +170,16 @@ serve(async (req) => {
 
     if (dbError) {
       console.error('Database error:', dbError);
-      return new Response(getStyledHTML('error', 'Failed to save email configuration'), { headers: { 'Content-Type': 'text/html' } });
+      return new Response(getStyledHTML('error', 'Failed to save email configuration'), { headers: htmlHeaders });
     }
 
     console.log('Email provider config saved successfully');
 
     // Return success page
-    return new Response(getStyledHTML('success'), { headers: { 'Content-Type': 'text/html' } });
+    return new Response(getStyledHTML('success'), { headers: htmlHeaders });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in aurinko-auth-callback:', error);
-    return new Response(getStyledHTML('error', errorMessage), { headers: { 'Content-Type': 'text/html' } });
+    return new Response(getStyledHTML('error', errorMessage), { headers: htmlHeaders });
   }
 });
