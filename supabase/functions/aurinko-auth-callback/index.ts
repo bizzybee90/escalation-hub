@@ -190,6 +190,36 @@ serve(async (req) => {
       console.log('Using known maccleaning.uk aliases:', aliases);
     }
 
+    // Create webhook subscription for email notifications
+    const webhookUrl = `${SUPABASE_URL}/functions/v1/aurinko-webhook`;
+    console.log('Creating email subscription with webhook URL:', webhookUrl);
+    
+    try {
+      const subscriptionResponse = await fetch('https://api.aurinko.io/v1/subscriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenData.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          resource: '/email/messages',
+          notificationUrl: webhookUrl,
+        }),
+      });
+
+      if (subscriptionResponse.ok) {
+        const subscriptionData = await subscriptionResponse.json();
+        console.log('Email subscription created successfully:', JSON.stringify(subscriptionData));
+      } else {
+        const subscriptionError = await subscriptionResponse.text();
+        console.error('Failed to create email subscription:', subscriptionResponse.status, subscriptionError);
+        // Continue anyway - we can still store the config
+      }
+    } catch (subError) {
+      console.error('Error creating subscription:', subError);
+      // Continue anyway
+    }
+
     // Store in database
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
