@@ -17,8 +17,6 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const AURINKO_CLIENT_ID = Deno.env.get('AURINKO_CLIENT_ID')!;
-    const AURINKO_CLIENT_SECRET = Deno.env.get('AURINKO_CLIENT_SECRET')!;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -61,7 +59,7 @@ serve(async (req) => {
     if (afterDate) {
       queryParams.push(`after=${afterDate.toISOString()}`);
     }
-    queryParams.push('limit=100'); // Process in batches
+    queryParams.push('limit=50'); // Process in batches
     
     const fetchUrl = `${baseUrl}?${queryParams.join('&')}`;
     console.log('Fetching emails from:', fetchUrl);
@@ -76,7 +74,6 @@ serve(async (req) => {
       const errorText = await messagesResponse.text();
       console.error('Failed to fetch messages:', messagesResponse.status, errorText);
       
-      // If token expired, we'd need to refresh - for now, report the error
       return new Response(JSON.stringify({ 
         error: 'Failed to fetch messages',
         details: errorText,
@@ -88,17 +85,17 @@ serve(async (req) => {
     }
 
     const messagesData = await messagesResponse.json();
-    console.log('Fetched', messagesData.records?.length || 0, 'messages');
+    console.log('Fetched', messagesData.records?.length || 0, 'messages from list API');
 
     // Process each message
-    for (const message of messagesData.records || []) {
+    for (const messageSummary of messagesData.records || []) {
       try {
         // Skip if already processed (check by external ID)
-        const externalId = message.id?.toString();
+        const externalId = messageSummary.id?.toString();
         const { data: existing } = await supabase
           .from('conversations')
           .select('id')
-          .eq('external_conversation_id', externalId)
+          .eq('external_conversation_id', `aurinko_${externalId}`)
           .single();
 
         if (existing) {
@@ -106,12 +103,43 @@ serve(async (req) => {
           continue;
         }
 
-        // Extract email details
-        const fromEmail = message.from?.email?.toLowerCase() || '';
-        const fromName = message.from?.name || fromEmail.split('@')[0];
+        // IMPORTANT: Fetch full message details to get the body content
+        console.log('Fetching full message details for:', externalId);
+        const fullMessageResponse = await fetch(`https://api.aurinko.io/v1/email/messages/${externalId}`, {
+          headers: {
+            'Authorization': `Bearer ${config.access_token}`,
+          },
+        });
+
+        if (!fullMessageResponse.ok) {
+          console.error('Failed to fetch full message:', externalId, fullMessageResponse.status);
+          continue;
+        }
+
+        const message = await fullMessageResponse.json();
+        console.log('Full message fetched, has textBody:', !!message.textBody, 'has htmlBody:', !!message.htmlBody, 'has body:', !!message.body);
+
+        // Extract email details - check multiple possible field names
+        const fromEmail = message.from?.email?.toLowerCase() || message.sender?.email?.toLowerCase() || '';
+        const fromName = message.from?.name || message.sender?.name || fromEmail.split('@')[0];
         const subject = message.subject || 'No Subject';
-        const body = message.textBody || message.htmlBody?.replace(/<[^>]+>/g, '') || '';
-        const receivedAt = message.receivedAt || message.createdAt;
+        
+        // Try multiple fields for body content
+        let body = message.textBody || message.text || message.body?.text || '';
+        if (!body && message.htmlBody) {
+          // Strip HTML tags as fallback
+          body = message.htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+        if (!body && message.body?.html) {
+          body = message.body.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+        if (!body && message.snippet) {
+          body = message.snippet;
+        }
+        
+        console.log('Extracted body length:', body.length, 'preview:', body.substring(0, 100));
+        
+        const receivedAt = message.receivedAt || message.createdAt || message.date;
 
         // Skip outbound emails (from our connected accounts)
         const allConnectedEmails = [config.email_address.toLowerCase(), ...(config.aliases || []).map((a: string) => a.toLowerCase())];
@@ -151,7 +179,7 @@ serve(async (req) => {
         }
 
         // Get original recipient (to address)
-        const toAddresses = message.to?.map((t: any) => t.email?.toLowerCase()) || [];
+        const toAddresses = message.to?.map((t: any) => (t.email || t).toLowerCase()) || [];
         const originalRecipient = toAddresses.find((addr: string) => allConnectedEmails.includes(addr)) || config.email_address;
 
         // Create conversation
@@ -163,11 +191,12 @@ serve(async (req) => {
             channel: 'email',
             title: subject,
             status: 'new',
-            external_conversation_id: externalId,
+            external_conversation_id: `aurinko_${externalId}`,
             metadata: {
               original_recipient_email: originalRecipient,
               thread_id: message.threadId,
               email_provider: config.provider,
+              aurinko_message_id: externalId,
             },
             created_at: receivedAt,
           })
@@ -179,8 +208,8 @@ serve(async (req) => {
           continue;
         }
 
-        // Create message
-        await supabase
+        // Create message with the full body
+        const { error: msgError } = await supabase
           .from('messages')
           .insert({
             conversation_id: conversation.id,
@@ -190,21 +219,45 @@ serve(async (req) => {
             actor_type: 'customer',
             actor_name: fromName,
             created_at: receivedAt,
+            raw_payload: message, // Store full message for debugging
           });
+
+        if (msgError) {
+          console.error('Error creating message:', msgError);
+          continue;
+        }
 
         messagesProcessed++;
-        console.log('Processed message:', subject);
+        console.log('Processed message:', subject, 'body length:', body.length);
 
         // Trigger AI agent for the new conversation
-        try {
-          await supabase.functions.invoke('claude-ai-agent-tools', {
-            body: {
-              conversationId: conversation.id,
-              messageBody: body.substring(0, 5000),
-            },
-          });
-        } catch (aiError) {
-          console.log('AI agent call failed (non-blocking):', aiError);
+        if (body.length > 0) {
+          try {
+            console.log('Triggering AI agent for conversation:', conversation.id);
+            const aiResponse = await fetch(`${SUPABASE_URL}/functions/v1/claude-ai-agent-tools`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                conversationId: conversation.id,
+                customerMessage: body.substring(0, 5000),
+                channel: 'email',
+                customerName: fromName,
+                customerEmail: fromEmail,
+              }),
+            });
+            console.log('AI agent response status:', aiResponse.status);
+            if (!aiResponse.ok) {
+              const aiError = await aiResponse.text();
+              console.error('AI agent error:', aiError);
+            }
+          } catch (aiError) {
+            console.error('AI agent call failed (non-blocking):', aiError);
+          }
+        } else {
+          console.log('Skipping AI agent - no body content');
         }
 
       } catch (msgError) {

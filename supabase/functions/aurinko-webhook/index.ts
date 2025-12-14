@@ -111,24 +111,58 @@ serve(async (req) => {
 });
 
 async function processNewEmail(supabase: any, emailConfig: any, emailData: any) {
-  console.log('Processing new email:', emailData.id);
+  const messageId = emailData.id || emailData.messageId;
+  console.log('Processing new email notification, messageId:', messageId);
 
-  const senderEmail = emailData.from?.email || emailData.sender?.email;
-  const senderName = emailData.from?.name || emailData.sender?.name || senderEmail;
-  const subject = emailData.subject || 'No Subject';
-  const body = emailData.textBody || emailData.snippet || '';
+  // Fetch full message details from Aurinko API
+  const messageResponse = await fetch(`https://api.aurinko.io/v1/email/messages/${messageId}`, {
+    headers: {
+      'Authorization': `Bearer ${emailConfig.access_token}`,
+    },
+  });
 
-  // Extract the recipient (To) address - the address the customer emailed to
-  // This could be the primary email or an alias
-  let recipientEmail = emailConfig.email_address; // default to primary
-  if (emailData.to && Array.isArray(emailData.to) && emailData.to.length > 0) {
-    // Check if any of the To addresses match our account or aliases
+  if (!messageResponse.ok) {
+    console.error('Failed to fetch full message:', messageResponse.status);
+    // Fall back to using the data from the notification
+    return processEmailFromData(supabase, emailConfig, emailData);
+  }
+
+  const message = await messageResponse.json();
+  console.log('Fetched full message, has textBody:', !!message.textBody, 'has htmlBody:', !!message.htmlBody);
+  
+  return processEmailFromData(supabase, emailConfig, message);
+}
+
+async function processEmailFromData(supabase: any, emailConfig: any, message: any) {
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+  
+  const senderEmail = (message.from?.email || message.sender?.email || '').toLowerCase();
+  const senderName = message.from?.name || message.sender?.name || senderEmail.split('@')[0];
+  const subject = message.subject || 'No Subject';
+  
+  // Try multiple fields for body content
+  let body = message.textBody || message.text || message.body?.text || '';
+  if (!body && message.htmlBody) {
+    body = message.htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  if (!body && message.body?.html) {
+    body = message.body.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  if (!body && message.snippet) {
+    body = message.snippet;
+  }
+  
+  console.log('Email body length:', body.length, 'preview:', body.substring(0, 100));
+
+  // Extract the recipient (To) address
+  let recipientEmail = emailConfig.email_address;
+  if (message.to && Array.isArray(message.to) && message.to.length > 0) {
     const allOurAddresses = [
       emailConfig.email_address.toLowerCase(),
       ...(emailConfig.aliases || []).map((a: string) => a.toLowerCase())
     ];
     
-    for (const toAddr of emailData.to) {
+    for (const toAddr of message.to) {
       const toEmail = (toAddr.email || toAddr).toLowerCase();
       if (allOurAddresses.includes(toEmail)) {
         recipientEmail = toEmail;
@@ -148,7 +182,7 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
     emailConfig.email_address.toLowerCase(),
     ...(emailConfig.aliases || []).map((a: string) => a.toLowerCase())
   ];
-  if (allOurAddresses.includes(senderEmail.toLowerCase())) {
+  if (allOurAddresses.includes(senderEmail)) {
     console.log('Skipping outbound email from our account/alias');
     return;
   }
@@ -182,7 +216,7 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
   }
 
   // Check for existing conversation with this email thread
-  const threadId = emailData.threadId || emailData.id;
+  const threadId = message.threadId || message.id;
   let { data: existingConversation } = await supabase
     .from('conversations')
     .select('*')
@@ -216,8 +250,8 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
         external_conversation_id: `aurinko_${threadId}`,
         metadata: { 
           aurinko_account_id: emailConfig.account_id,
-          aurinko_message_id: emailData.id,
-          original_recipient_email: recipientEmail, // Store which address was emailed
+          aurinko_message_id: message.id,
+          original_recipient_email: recipientEmail,
         },
       })
       .select()
@@ -231,7 +265,7 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
     console.log('Created new conversation:', conversationId, 'with recipient:', recipientEmail);
   }
 
-  // Add message
+  // Add message with full body
   const { error: msgError } = await supabase
     .from('messages')
     .insert({
@@ -240,8 +274,8 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
       actor_name: senderName,
       direction: 'inbound',
       channel: 'email',
-      body: body,
-      raw_payload: emailData,
+      body: body.substring(0, 10000),
+      raw_payload: message,
     });
 
   if (msgError) {
@@ -249,26 +283,35 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
     return;
   }
 
-  console.log('Message added to conversation:', conversationId);
+  console.log('Message added to conversation:', conversationId, 'body length:', body.length);
 
   // Trigger AI agent for processing
-  try {
-    await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/claude-ai-agent-tools`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        conversationId,
-        customerMessage: body,
-        channel: 'email',
-        customerName: senderName,
-        customerEmail: senderEmail,
-      }),
-    });
-    console.log('AI agent triggered for conversation:', conversationId);
-  } catch (aiError) {
-    console.error('Error triggering AI agent:', aiError);
+  if (body.length > 0) {
+    try {
+      console.log('Triggering AI agent for conversation:', conversationId);
+      const aiResponse = await fetch(`${SUPABASE_URL}/functions/v1/claude-ai-agent-tools`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversationId,
+          customerMessage: body.substring(0, 5000),
+          channel: 'email',
+          customerName: senderName,
+          customerEmail: senderEmail,
+        }),
+      });
+      console.log('AI agent response status:', aiResponse.status);
+      if (!aiResponse.ok) {
+        const aiError = await aiResponse.text();
+        console.error('AI agent error:', aiError);
+      }
+    } catch (aiError) {
+      console.error('Error triggering AI agent:', aiError);
+    }
+  } else {
+    console.log('Skipping AI agent - no body content');
   }
 }
