@@ -157,6 +157,7 @@ export type Database = {
           embedding: string | null
           escalated_at: string | null
           external_conversation_id: string | null
+          extracted_entities: Json | null
           final_response: string | null
           first_response_at: string | null
           human_edited: boolean | null
@@ -175,9 +176,15 @@ export type Database = {
           sla_target_minutes: number | null
           snoozed_until: string | null
           status: string | null
+          suggested_actions: string[] | null
           summary_for_human: string | null
+          thread_context: Json | null
           title: string | null
+          triage_confidence: number | null
+          triage_reasoning: string | null
           updated_at: string | null
+          urgency: string | null
+          urgency_reason: string | null
           workspace_id: string | null
         }
         Insert: {
@@ -202,6 +209,7 @@ export type Database = {
           embedding?: string | null
           escalated_at?: string | null
           external_conversation_id?: string | null
+          extracted_entities?: Json | null
           final_response?: string | null
           first_response_at?: string | null
           human_edited?: boolean | null
@@ -220,9 +228,15 @@ export type Database = {
           sla_target_minutes?: number | null
           snoozed_until?: string | null
           status?: string | null
+          suggested_actions?: string[] | null
           summary_for_human?: string | null
+          thread_context?: Json | null
           title?: string | null
+          triage_confidence?: number | null
+          triage_reasoning?: string | null
           updated_at?: string | null
+          urgency?: string | null
+          urgency_reason?: string | null
           workspace_id?: string | null
         }
         Update: {
@@ -247,6 +261,7 @@ export type Database = {
           embedding?: string | null
           escalated_at?: string | null
           external_conversation_id?: string | null
+          extracted_entities?: Json | null
           final_response?: string | null
           first_response_at?: string | null
           human_edited?: boolean | null
@@ -265,9 +280,15 @@ export type Database = {
           sla_target_minutes?: number | null
           snoozed_until?: string | null
           status?: string | null
+          suggested_actions?: string[] | null
           summary_for_human?: string | null
+          thread_context?: Json | null
           title?: string | null
+          triage_confidence?: number | null
+          triage_reasoning?: string | null
           updated_at?: string | null
+          urgency?: string | null
+          urgency_reason?: string | null
           workspace_id?: string | null
         }
         Relationships: [

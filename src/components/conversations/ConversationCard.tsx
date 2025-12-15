@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Conversation } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass, Star, Mail, Ban, Megaphone, Briefcase, Receipt, Settings2 } from 'lucide-react';
+import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass, Star, Mail, Ban, Megaphone, Briefcase, Receipt, Settings2, Zap, Users, Package, Info, ThumbsUp, MessageCircle } from 'lucide-react';
 import { ChannelIcon } from '../shared/ChannelIcon';
 import { cn } from '@/lib/utils';
 import { useIsTablet } from '@/hooks/use-tablet';
@@ -12,18 +12,27 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TriageQuickActions } from './TriageQuickActions';
 
-// Email classification badge helper
+// Email classification badge helper - expanded for triage agent
 const getClassificationBadge = (classification: string | null | undefined) => {
   if (!classification) return null;
   
   const badges: Record<string, { icon: typeof Mail; label: string; className: string }> = {
+    // Requires reply categories
     customer_inquiry: { icon: Mail, label: 'Inquiry', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
+    customer_complaint: { icon: AlertTriangle, label: 'Complaint', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
+    customer_feedback: { icon: ThumbsUp, label: 'Feedback', className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' },
+    lead_new: { icon: UserPlus, label: 'New Lead', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
+    lead_followup: { icon: MessageCircle, label: 'Follow-up', className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+    supplier_urgent: { icon: Zap, label: 'Supplier', className: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20' },
+    partner_request: { icon: Users, label: 'Partner', className: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
+    // Auto-triage categories
     automated_notification: { icon: Bot, label: 'Auto', className: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
     spam_phishing: { icon: Ban, label: 'Spam', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
     marketing_newsletter: { icon: Megaphone, label: 'Marketing', className: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
     recruitment_hr: { icon: Briefcase, label: 'Recruitment', className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
     receipt_confirmation: { icon: Receipt, label: 'Receipt', className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
     internal_system: { icon: Settings2, label: 'System', className: 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20' },
+    informational_only: { icon: Info, label: 'Info', className: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20' },
   };
   
   return badges[classification] || null;
@@ -324,7 +333,23 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
 
           {/* Badge Row */}
           <div className="flex flex-wrap items-center gap-2 mb-3.5">
-            {conversation.priority && (
+            {/* Urgency Badge */}
+            {conversation.urgency && (
+              <Badge 
+                variant={conversation.urgency === 'high' ? 'destructive' : conversation.urgency === 'medium' ? 'secondary' : 'outline'}
+                className={cn(
+                  "rounded-full text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm",
+                  conversation.urgency === 'high' && "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+                  conversation.urgency === 'medium' && "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+                  conversation.urgency === 'low' && "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20"
+                )}
+                title={conversation.urgency_reason || undefined}
+              >
+                {conversation.urgency === 'high' ? '🔴' : conversation.urgency === 'medium' ? '🟡' : '⚪'} {conversation.urgency}
+              </Badge>
+            )}
+
+            {conversation.priority && !conversation.urgency && (
               <Badge 
                 variant={getPriorityVariant(conversation.priority)}
                 className="rounded-full text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm"
@@ -340,7 +365,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
 
             {/* Email Classification Badge */}
             {(() => {
-              const classificationBadge = getClassificationBadge((conversation as any).email_classification);
+              const classificationBadge = getClassificationBadge(conversation.email_classification);
               if (!classificationBadge) return null;
               const ClassIcon = classificationBadge.icon;
               return (
@@ -380,6 +405,14 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
               <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20 flex items-center gap-1.5">
                 <Star className="h-3 w-3 fill-current" />
                 {conversation.customer_satisfaction}/5
+              </Badge>
+            )}
+
+            {/* Triage Confidence Indicator */}
+            {conversation.triage_confidence !== null && conversation.triage_confidence !== undefined && conversation.triage_confidence < 0.7 && (
+              <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 flex items-center gap-1.5">
+                <AlertTriangle className="h-3 w-3" />
+                Review
               </Badge>
             )}
           </div>
@@ -453,7 +486,23 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
 
         {/* Badge Row */}
         <div className="flex flex-wrap items-center gap-2.5 mb-4">
-          {conversation.priority && (
+          {/* Urgency Badge */}
+          {conversation.urgency && (
+            <Badge 
+              variant={conversation.urgency === 'high' ? 'destructive' : conversation.urgency === 'medium' ? 'secondary' : 'outline'}
+              className={cn(
+                "rounded-full text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm",
+                conversation.urgency === 'high' && "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+                conversation.urgency === 'medium' && "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+                conversation.urgency === 'low' && "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20"
+              )}
+              title={conversation.urgency_reason || undefined}
+            >
+              {conversation.urgency === 'high' ? '🔴' : conversation.urgency === 'medium' ? '🟡' : '⚪'} {conversation.urgency}
+            </Badge>
+          )}
+
+          {conversation.priority && !conversation.urgency && (
             <Badge 
               variant={getPriorityVariant(conversation.priority)}
               className="rounded-full text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm"
@@ -469,7 +518,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
 
           {/* Email Classification Badge */}
           {(() => {
-            const classificationBadge = getClassificationBadge((conversation as any).email_classification);
+            const classificationBadge = getClassificationBadge(conversation.email_classification);
             if (!classificationBadge) return null;
             const ClassIcon = classificationBadge.icon;
             return (
@@ -509,6 +558,14 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
             <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20 flex items-center gap-1.5">
               <Star className="h-3 w-3 fill-current" />
               {conversation.customer_satisfaction}/5
+            </Badge>
+          )}
+
+          {/* Triage Confidence Indicator */}
+          {conversation.triage_confidence !== null && conversation.triage_confidence !== undefined && conversation.triage_confidence < 0.7 && (
+            <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 flex items-center gap-1.5">
+              <AlertTriangle className="h-3 w-3" />
+              Review
             </Badge>
           )}
         </div>

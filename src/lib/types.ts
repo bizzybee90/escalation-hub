@@ -78,6 +78,16 @@ export interface Conversation {
   updated_at: string;
   customer?: Customer;
   assigned_user?: User;
+  // Triage agent fields
+  urgency?: 'high' | 'medium' | 'low' | null;
+  urgency_reason?: string | null;
+  extracted_entities?: Record<string, any> | null;
+  suggested_actions?: string[] | null;
+  triage_reasoning?: string | null;
+  thread_context?: Record<string, any> | null;
+  triage_confidence?: number | null;
+  email_classification?: string | null;
+  requires_reply?: boolean | null;
 }
 
 export interface Message {
