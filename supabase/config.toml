@@ -89,3 +89,6 @@ verify_jwt = false
 
 [functions.email-sync]
 verify_jwt = false
+
+[functions.email-triage-agent]
+verify_jwt = false

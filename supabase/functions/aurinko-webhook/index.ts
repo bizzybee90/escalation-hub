@@ -314,9 +314,9 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
   // Mark email as read in Aurinko/Gmail
   await markEmailAsRead(emailConfig, aurinkoMessageId);
 
-  // Trigger AI agent for processing
+  // Trigger triage and AI agent for processing
   if (body.length > 0) {
-    await triggerAIAnalysis(supabase, conversationId, body, senderName, senderEmail, customer, subject);
+    await triggerAIAnalysis(supabase, conversationId, body, senderName, senderEmail, customer, subject, recipientEmail);
   }
 }
 
@@ -349,79 +349,202 @@ async function triggerAIAnalysis(
   senderName: string, 
   senderEmail: string, 
   customer: any,
-  subject: string
+  subject: string,
+  toEmail?: string
 ) {
   try {
-    console.log('Triggering AI agent for conversation:', conversationId);
+    console.log('Triggering triage agent for conversation:', conversationId);
     
-    // Call AI agent with proper structure
-    const aiResponse = await supabase.functions.invoke('claude-ai-agent-tools', {
+    // First, check for sender rules
+    const senderDomain = senderEmail.split('@')[1]?.toLowerCase();
+    const { data: senderRule } = await supabase
+      .from('sender_rules')
+      .select('*')
+      .or(`sender_pattern.eq.${senderEmail.toLowerCase()},sender_pattern.eq.@${senderDomain}`)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
+    // Fetch business context
+    const { data: workspace } = await supabase
+      .from('users')
+      .select('workspace_id')
+      .limit(1)
+      .single();
+    
+    let businessContext = null;
+    if (workspace?.workspace_id) {
+      const { data: context } = await supabase
+        .from('business_context')
+        .select('*')
+        .eq('workspace_id', workspace.workspace_id)
+        .single();
+      businessContext = context;
+    }
+
+    // Call the dedicated triage agent (Haiku - fast & cheap)
+    const triageResponse = await supabase.functions.invoke('email-triage-agent', {
       body: {
-        message: {
-          message_content: body.substring(0, 5000),
-          channel: 'email',
-          customer_identifier: senderEmail,
-          customer_name: senderName,
-          sender_phone: customer?.phone || null,
-          sender_email: senderEmail,
+        email: {
+          from_email: senderEmail,
+          from_name: senderName,
+          subject: subject,
+          body: body.substring(0, 5000),
+          to_email: toEmail,
         },
-        conversation_history: [],
-        customer_data: customer,
+        workspace_id: workspace?.workspace_id,
+        business_context: businessContext ? {
+          is_hiring: businessContext.is_hiring,
+          active_dispute: businessContext.active_stripe_case || businessContext.active_insurance_claim,
+        } : null,
+        sender_rule: senderRule ? {
+          default_classification: senderRule.default_classification,
+          default_requires_reply: senderRule.default_requires_reply,
+          override_classification: senderRule.override_classification,
+          override_requires_reply: senderRule.override_requires_reply,
+        } : null,
       }
     });
-    
-    console.log('AI agent response:', JSON.stringify(aiResponse.data || aiResponse.error));
-    
-    if (aiResponse.data && !aiResponse.error) {
-      const aiOutput = aiResponse.data;
-      
-      // Determine status based on requires_reply and escalate flags
-      const requiresReply = aiOutput.requires_reply !== false; // Default to true for backwards compatibility
-      let status = 'new';
-      if (!requiresReply) {
-        status = 'resolved'; // Auto-close emails that don't need reply
-      } else if (aiOutput.escalate) {
-        status = 'escalated';
-      }
-      
-      // Update conversation with AI analysis including triage fields
-      const { error: updateError } = await supabase
+
+    console.log('Triage response:', JSON.stringify(triageResponse.data || triageResponse.error));
+
+    if (triageResponse.error) {
+      console.error('Triage agent error:', triageResponse.error);
+      // On triage error, default to requiring human review
+      await supabase
         .from('conversations')
         .update({
-          ai_confidence: aiOutput.confidence || 0,
-          ai_sentiment: aiOutput.sentiment || 'neutral',
-          ai_reason_for_escalation: aiOutput.escalation_reason || null,
-          ai_draft_response: aiOutput.response || null,
-          summary_for_human: aiOutput.ai_summary || null,
-          title: aiOutput.ai_title || subject,
-          category: aiOutput.ai_category || 'other',
-          is_escalated: aiOutput.escalate || false,
-          status: status,
-          escalated_at: aiOutput.escalate ? new Date().toISOString() : null,
-          resolved_at: !requiresReply ? new Date().toISOString() : null,
-          requires_reply: requiresReply,
-          email_classification: aiOutput.email_classification || null,
+          status: 'new',
+          requires_reply: true,
+          urgency: 'high',
+          urgency_reason: 'Triage failed - requires manual review',
         })
         .eq('id', conversationId);
+      return;
+    }
+
+    const triage = triageResponse.data;
+
+    // Update sender rule hit count if applied
+    if (senderRule && triage.applied_rule) {
+      await supabase
+        .from('sender_rules')
+        .update({ hit_count: (senderRule.hit_count || 0) + 1 })
+        .eq('id', senderRule.id);
+    }
+
+    // Determine status based on triage result
+    let status = 'new';
+    if (!triage.classification.requires_reply) {
+      status = 'resolved'; // Auto-close non-reply emails
+    } else if (triage.needs_human_review) {
+      status = 'pending_review';
+    } else if (triage.priority.urgency === 'high' && (triage.sentiment.tone === 'angry' || triage.sentiment.tone === 'frustrated')) {
+      status = 'escalated';
+    }
+
+    // Update conversation with triage data
+    const updateData: any = {
+      status: status,
+      requires_reply: triage.classification.requires_reply,
+      email_classification: triage.classification.category,
+      triage_confidence: triage.classification.confidence,
+      urgency: triage.priority.urgency,
+      urgency_reason: triage.priority.urgency_reason,
+      ai_sentiment: triage.sentiment.tone,
+      extracted_entities: triage.entities || {},
+      suggested_actions: triage.suggested_actions || [],
+      triage_reasoning: triage.reasoning,
+      thread_context: triage.thread_context || {},
+      summary_for_human: triage.summary?.one_line || null,
+      title: triage.summary?.one_line || subject,
+    };
+
+    // Set resolved_at if auto-resolved
+    if (!triage.classification.requires_reply) {
+      updateData.resolved_at = new Date().toISOString();
+    }
+
+    // Set escalated_at if escalated
+    if (status === 'escalated') {
+      updateData.is_escalated = true;
+      updateData.escalated_at = new Date().toISOString();
+    }
+
+    await supabase
+      .from('conversations')
+      .update(updateData)
+      .eq('id', conversationId);
+
+    console.log('Conversation updated with triage data:', {
+      category: triage.classification.category,
+      requires_reply: triage.classification.requires_reply,
+      urgency: triage.priority.urgency,
+      status: status,
+    });
+
+    // If requires reply and not escalated, generate AI draft response
+    if (triage.classification.requires_reply && status !== 'escalated') {
+      console.log('Generating AI draft response...');
       
-      if (updateError) {
-        console.error('Error updating conversation with AI data:', updateError);
-      } else {
-        console.log('Updated conversation with AI analysis:', {
-          title: aiOutput.ai_title,
-          category: aiOutput.ai_category,
-          sentiment: aiOutput.sentiment,
+      const aiResponse = await supabase.functions.invoke('claude-ai-agent-tools', {
+        body: {
+          message: {
+            message_content: body.substring(0, 5000),
+            channel: 'email',
+            customer_identifier: senderEmail,
+            customer_name: senderName,
+            sender_phone: customer?.phone || null,
+            sender_email: senderEmail,
+          },
+          conversation_history: [],
+          customer_data: customer,
+          triage_context: {
+            category: triage.classification.category,
+            urgency: triage.priority.urgency,
+            sentiment: triage.sentiment.tone,
+            entities: triage.entities,
+            suggested_actions: triage.suggested_actions,
+          }
+        }
+      });
+
+      if (aiResponse.data && !aiResponse.error) {
+        const aiOutput = aiResponse.data;
+        
+        // Update with AI draft response
+        await supabase
+          .from('conversations')
+          .update({
+            ai_draft_response: aiOutput.response || null,
+            ai_confidence: aiOutput.confidence || triage.classification.confidence,
+            ai_reason_for_escalation: aiOutput.escalation_reason || null,
+            category: aiOutput.ai_category || triage.classification.category,
+            is_escalated: aiOutput.escalate || false,
+            status: aiOutput.escalate ? 'escalated' : status,
+            escalated_at: aiOutput.escalate ? new Date().toISOString() : null,
+          })
+          .eq('id', conversationId);
+
+        console.log('AI draft response generated:', {
+          has_response: !!aiOutput.response,
           confidence: aiOutput.confidence,
           escalated: aiOutput.escalate,
-          requires_reply: requiresReply,
-          email_classification: aiOutput.email_classification,
-          status: status,
         });
+      } else {
+        console.error('AI response generation error:', aiResponse.error);
       }
-    } else {
-      console.error('AI agent error:', aiResponse.error);
     }
+
   } catch (aiError) {
-    console.error('AI agent call failed (non-blocking):', aiError);
+    console.error('Triage/AI pipeline failed (non-blocking):', aiError);
+    // Ensure conversation is at least visible
+    await supabase
+      .from('conversations')
+      .update({
+        status: 'new',
+        requires_reply: true,
+      })
+      .eq('id', conversationId);
   }
 }
