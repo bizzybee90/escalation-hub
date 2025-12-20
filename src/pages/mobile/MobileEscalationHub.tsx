@@ -101,7 +101,7 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
       .select(`
         *,
         customer:customers(*),
-        assigned_user:users(*)
+        assigned_user:users!conversations_assigned_to_fkey(*)
       `)
       .eq('workspace_id', userData.workspace_id);
 
