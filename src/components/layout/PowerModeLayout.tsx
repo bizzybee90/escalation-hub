@@ -27,73 +27,72 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
         <Sidebar />
       </aside>
 
-      {/* Main Content - 3 Column Layout (responsive) */}
-      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0 h-full overflow-hidden">
-        {/* Conversation List Panel (hidden on mobile when conversation selected) */}
-        <ResizablePanel 
-          defaultSize={35} 
-          minSize={30}
-          maxSize={50}
-          collapsible={false}
-          className={selectedConversation ? "hidden md:flex min-h-0" : "flex min-h-0"}
-        >
-          <div className="flex-1 flex flex-col border-r border-border/30 bg-card w-full overflow-hidden min-w-0">
+      {/* Main Content */}
+      {!selectedConversation ? (
+        /* When nothing is selected, show just the inbox (no empty 2nd/3rd panels) */
+        <main className="flex-1 min-h-0 h-full overflow-hidden">
+          <div className="h-full w-full border-r border-border/30 bg-card overflow-hidden min-w-0">
             <JaceStyleInbox
               filter={filter}
               onSelect={setSelectedConversation}
             />
           </div>
-        </ResizablePanel>
+        </main>
+      ) : (
+        /* When selected, show the full 3-column power layout */
+        <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0 h-full overflow-hidden">
+          {/* Conversation List Panel */}
+          <ResizablePanel 
+            defaultSize={35} 
+            minSize={30}
+            maxSize={50}
+            collapsible={false}
+            className="flex min-h-0"
+          >
+            <div className="flex-1 flex flex-col border-r border-border/30 bg-card w-full overflow-hidden min-w-0">
+              <JaceStyleInbox
+                filter={filter}
+                onSelect={setSelectedConversation}
+              />
+            </div>
+          </ResizablePanel>
 
-        <ResizableHandle className="w-1 bg-border/50 hover:bg-border transition-colors hidden md:block" />
+          <ResizableHandle className="w-1 bg-border/50 hover:bg-border transition-colors hidden md:block" />
 
-        {/* Conversation Thread Panel (full width on mobile when selected) */}
-        <ResizablePanel 
-          defaultSize={50} 
-          minSize={35}
-          maxSize={60}
-          collapsible={false}
-          className="w-full min-h-0 flex flex-col h-full min-w-0"
-        >
-          <div className="h-full w-full min-h-0 overflow-hidden min-w-0">
-            {selectedConversation ? (
+          {/* Conversation Thread Panel */}
+          <ResizablePanel 
+            defaultSize={45} 
+            minSize={35}
+            maxSize={60}
+            collapsible={false}
+            className="w-full min-h-0 flex flex-col h-full min-w-0"
+          >
+            <div className="h-full w-full min-h-0 overflow-hidden min-w-0">
               <ConversationThread
                 key={refreshKey}
                 conversation={selectedConversation}
                 onUpdate={handleUpdate}
                 onBack={() => setSelectedConversation(null)}
               />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/10">
-                <MessageSquare className="h-16 w-16 mb-4 opacity-10" />
-                <p className="text-lg font-medium">No conversation selected</p>
-                <p className="text-sm mt-1 opacity-75">Choose a conversation from the list to get started</p>
-              </div>
-            )}
-          </div>
-        </ResizablePanel>
+            </div>
+          </ResizablePanel>
 
-        <ResizableHandle className="w-1 bg-border/50 hover:bg-border transition-colors hidden md:block" />
+          <ResizableHandle className="w-1 bg-border/50 hover:bg-border transition-colors hidden md:block" />
 
-        {/* Customer Context Panel (hidden on mobile) */}
-        <ResizablePanel 
-          defaultSize={28} 
-          minSize={22}
-          maxSize={35}
-          collapsible={false}
-          className="hidden md:flex min-h-0"
-        >
-          <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-card/50 p-5 hidden md:flex min-w-0">
-            {selectedConversation ? (
+          {/* Customer Context Panel */}
+          <ResizablePanel 
+            defaultSize={20} 
+            minSize={18}
+            maxSize={35}
+            collapsible={false}
+            className="hidden md:flex min-h-0"
+          >
+            <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-card/50 p-5 hidden md:flex min-w-0">
               <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm opacity-60">
-                <p className="text-center px-4">Customer details will appear here when you select a conversation</p>
-              </div>
-            )}
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      )}
     </div>
   );
 };
