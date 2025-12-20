@@ -1,14 +1,14 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Conversation } from '@/lib/types';
 import { SearchInput } from './SearchInput';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, RefreshCw, Mail, MessageSquare, Phone, MessageCircle } from 'lucide-react';
+import { Loader2, Sparkles, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
+import { format, isToday, isYesterday } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-
+import { ChannelIcon } from '@/components/shared/ChannelIcon';
 interface JaceStyleInboxProps {
   onSelect: (conversation: Conversation) => void;
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi';
@@ -140,15 +140,7 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     return `${minutes}m ago`;
   };
 
-  const getChannelIcon = (channel: string) => {
-    switch (channel) {
-      case 'email': return <Mail className="h-3.5 w-3.5" />;
-      case 'sms': return <MessageSquare className="h-3.5 w-3.5" />;
-      case 'whatsapp': return <MessageCircle className="h-3.5 w-3.5" />;
-      case 'phone': return <Phone className="h-3.5 w-3.5" />;
-      default: return <Mail className="h-3.5 w-3.5" />;
-    }
-  };
+  // Channel icon is now handled by ChannelIcon component
 
   // State-based labels: what does the user need to DO, not how hard is it
   const getStateConfig = (bucket: string, hasAiDraft: boolean) => {
@@ -213,10 +205,11 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
           stateConfig.rowClass
         )}
       >
-        {/* Sender - fixed width, truncate */}
-        <div className="w-24 flex-shrink-0 min-w-0">
+        {/* Channel icon + Sender - fixed width, truncate */}
+        <div className="w-28 flex-shrink-0 min-w-0 flex items-center gap-1.5">
+          <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0 opacity-60" />
           <span className={cn(
-            "text-sm text-foreground truncate block",
+            "text-sm text-foreground truncate",
             isUrgent ? "font-semibold" : "font-medium"
           )}>
             {customerName}

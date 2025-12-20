@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Sidebar } from '@/components/sidebar/Sidebar';
@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ReviewQueueItem } from '@/components/review/ReviewQueueItem';
+import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -15,7 +18,8 @@ import {
   Sparkles,
   Bot,
   FileEdit,
-  Eye
+  Eye,
+  Keyboard
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +36,7 @@ interface ReviewConversation {
   why_this_needs_you: string;
   triage_confidence: number;
   created_at: string;
+  channel?: string;
   customer: {
     name: string;
     email: string;
@@ -42,17 +47,18 @@ interface ReviewConversation {
   }[];
 }
 
+// New state-based labels
 const bucketLabels: Record<string, string> = {
-  act_now: 'To Reply (Urgent)',
-  quick_win: 'To Reply (Quick)',
+  act_now: 'Needs attention',
+  quick_win: 'Needs reply',
   wait: 'FYI',
-  auto_handled: 'Done (Auto)',
+  auto_handled: 'Done',
 };
 
 const bucketColors: Record<string, string> = {
-  act_now: 'bg-destructive text-destructive-foreground',
+  act_now: 'bg-red-500 text-white',
   quick_win: 'bg-amber-500 text-white',
-  wait: 'bg-blue-500 text-white',
+  wait: 'bg-slate-500 text-white',
   auto_handled: 'bg-green-500 text-white',
 };
 
@@ -65,6 +71,7 @@ export default function Review() {
   const [showTeachMore, setShowTeachMore] = useState(false);
   const [automationLevel, setAutomationLevel] = useState<AutomationLevel>('auto');
   const [tonePreference, setTonePreference] = useState<TonePreference>('keep_current');
+  const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { celebrateConfirmation, celebratePatternLearned, celebrateQueueComplete } = useReviewFeedback();
@@ -94,6 +101,7 @@ export default function Review() {
           why_this_needs_you,
           triage_confidence,
           created_at,
+          channel,
           customer:customers(name, email),
           messages(body, created_at)
         `)
@@ -113,6 +121,79 @@ export default function Review() {
     },
     staleTime: 30000,
   });
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't capture if in input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'k':
+          e.preventDefault();
+          setCurrentIndex(prev => Math.max(0, prev - 1));
+          setShowChangePicker(false);
+          break;
+        case 'ArrowDown':
+        case 'j':
+          e.preventDefault();
+          setCurrentIndex(prev => Math.min(reviewQueue.length - 1, prev + 1));
+          setShowChangePicker(false);
+          break;
+        case 'Enter':
+        case 'l':
+          if (!showChangePicker && currentConversation) {
+            e.preventDefault();
+            handleConfirm();
+          }
+          break;
+        case 'h':
+          if (!showChangePicker) {
+            e.preventDefault();
+            setShowChangePicker(true);
+          }
+          break;
+        case 's':
+          e.preventDefault();
+          handleSkip();
+          break;
+        case 'Escape':
+          if (showChangePicker) {
+            e.preventDefault();
+            setShowChangePicker(false);
+          }
+          break;
+        case '1':
+          if (showChangePicker) {
+            e.preventDefault();
+            handleChange('act_now');
+          }
+          break;
+        case '2':
+          if (showChangePicker) {
+            e.preventDefault();
+            handleChange('quick_win');
+          }
+          break;
+        case '3':
+          if (showChangePicker) {
+            e.preventDefault();
+            handleChange('wait');
+          }
+          break;
+        case '4':
+          if (showChangePicker) {
+            e.preventDefault();
+            handleChange('auto_handled');
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [reviewQueue.length, showChangePicker, currentIndex]);
 
   // Mutation for confirming/changing review with teaching data
   const reviewMutation = useMutation({
@@ -151,8 +232,8 @@ export default function Review() {
 
       if (error) throw error;
 
-      const currentConversation = reviewQueue[currentIndex];
-      const senderEmail = currentConversation?.customer?.email;
+      const currentConv = reviewQueue[currentIndex];
+      const senderEmail = currentConv?.customer?.email;
       const senderDomain = senderEmail?.split('@')[1];
 
       // Get workspace ID
@@ -166,7 +247,7 @@ export default function Review() {
       if (outcome === 'changed' && newBucket) {
         await supabase.from('triage_corrections').insert({
           conversation_id: conversationId,
-          original_classification: currentConversation?.decision_bucket,
+          original_classification: currentConv?.decision_bucket,
           new_classification: newBucket,
           corrected_by: user.id,
           sender_email: senderEmail,
@@ -185,7 +266,6 @@ export default function Review() {
           .single();
 
         if (existingRule) {
-          // Update existing rule
           await supabase
             .from('sender_rules')
             .update({
@@ -195,7 +275,6 @@ export default function Review() {
             })
             .eq('id', existingRule.id);
         } else {
-          // Create new rule
           await supabase.from('sender_rules').insert({
             workspace_id: userData.workspace_id,
             sender_pattern: `@${senderDomain}`,
@@ -241,6 +320,9 @@ export default function Review() {
       return { ruleCreated: false };
     },
     onSuccess: (result, variables) => {
+      // Mark this conversation as reviewed locally
+      setReviewedIds(prev => new Set([...prev, variables.conversationId]));
+      
       queryClient.invalidateQueries({ queryKey: ['review-queue'] });
       queryClient.invalidateQueries({ queryKey: ['sidebar-view-counts'] });
 
@@ -258,10 +340,15 @@ export default function Review() {
       setTonePreference('keep_current');
       setShowChangePicker(false);
 
-      // Move to next or complete
-      if (currentIndex >= reviewQueue.length - 1) {
+      // Move to next unreviewed item
+      const nextUnreviewedIndex = reviewQueue.findIndex((conv, idx) => 
+        idx > currentIndex && !reviewedIds.has(conv.id) && conv.id !== variables.conversationId
+      );
+      
+      if (nextUnreviewedIndex !== -1) {
+        setCurrentIndex(nextUnreviewedIndex);
+      } else if (reviewedIds.size + 1 >= reviewQueue.length) {
         celebrateQueueComplete(reviewQueue.length);
-        setCurrentIndex(0);
       }
     },
     onError: () => {
@@ -274,11 +361,11 @@ export default function Review() {
   });
 
   const currentConversation = reviewQueue[currentIndex];
-  const progress = reviewQueue.length > 0 
-    ? ((currentIndex) / reviewQueue.length) * 100 
-    : 0;
+  const reviewedCount = reviewedIds.size;
+  const totalCount = reviewQueue.length;
+  const progress = totalCount > 0 ? (reviewedCount / totalCount) * 100 : 0;
 
-  const handleConfirm = () => {
+  const handleConfirm = useCallback(() => {
     if (!currentConversation) return;
     
     const hasTeachingData = showTeachMore && (automationLevel !== 'auto' || tonePreference !== 'keep_current');
@@ -288,9 +375,9 @@ export default function Review() {
       outcome: 'confirmed',
       teachingData: hasTeachingData ? { automationLevel, tonePreference } : undefined,
     });
-  };
+  }, [currentConversation, showTeachMore, automationLevel, tonePreference, reviewMutation]);
 
-  const handleChange = (newBucket: string) => {
+  const handleChange = useCallback((newBucket: string) => {
     if (!currentConversation) return;
     
     const hasTeachingData = showTeachMore && (automationLevel !== 'auto' || tonePreference !== 'keep_current');
@@ -301,15 +388,15 @@ export default function Review() {
       newBucket,
       teachingData: hasTeachingData ? { automationLevel, tonePreference } : undefined,
     });
-  };
+  }, [currentConversation, showTeachMore, automationLevel, tonePreference, reviewMutation]);
 
-  const handleSkip = () => {
+  const handleSkip = useCallback(() => {
     if (currentIndex < reviewQueue.length - 1) {
       setCurrentIndex(prev => prev + 1);
       setShowChangePicker(false);
       setShowTeachMore(false);
     }
-  };
+  }, [currentIndex, reviewQueue.length]);
 
   const senderDomain = currentConversation?.customer?.email?.split('@')[1];
 
@@ -338,255 +425,304 @@ export default function Review() {
       <Sidebar />
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="border-b p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Sparkles className="h-6 w-6 text-purple-500" />
-            <h1 className="text-2xl font-semibold">Teach BizzyBee</h1>
+        <div className="border-b px-6 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-5 w-5 text-purple-500" />
+              <h1 className="text-xl font-semibold">Teach BizzyBee</h1>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Keyboard className="h-3.5 w-3.5" />
+              <span>↑↓ navigate • L confirm • H change • S skip</span>
+            </div>
           </div>
-          <p className="text-muted-foreground mb-4">
-            Your feedback helps BizzyBee learn how your business works
-          </p>
           <div className="flex items-center gap-4">
             <Progress value={progress} className="flex-1 h-2" />
             <span className="text-sm text-muted-foreground whitespace-nowrap">
-              {currentIndex + 1} of {reviewQueue.length}
+              {reviewedCount} of {totalCount} reviewed
             </span>
           </div>
         </div>
 
-        {/* Main content */}
-        <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
-          {isLoading ? (
-            <div className="animate-pulse">Loading...</div>
-          ) : currentConversation ? (
-            <Card className="w-full max-w-2xl p-6 space-y-6">
-              {/* Sender info */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-medium">
-                    {currentConversation.customer?.name || 'Unknown Sender'}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {currentConversation.customer?.email || 'No email'}
-                  </p>
+        {/* Split panel layout */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left: Queue list */}
+          <div className="w-72 border-r flex-shrink-0 flex flex-col bg-muted/20">
+            <div className="px-3 py-2 border-b bg-muted/30">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Review Queue
+              </span>
+            </div>
+            <ScrollArea className="flex-1">
+              {isLoading ? (
+                <div className="p-4 text-center text-muted-foreground animate-pulse">
+                  Loading...
                 </div>
-                <span className="text-sm text-muted-foreground">
-                  {format(new Date(currentConversation.created_at), 'MMM d, h:mm a')}
-                </span>
-              </div>
+              ) : (
+                reviewQueue.map((conv, idx) => (
+                  <ReviewQueueItem
+                    key={conv.id}
+                    conversation={conv}
+                    isActive={idx === currentIndex}
+                    isReviewed={reviewedIds.has(conv.id)}
+                    onClick={() => {
+                      setCurrentIndex(idx);
+                      setShowChangePicker(false);
+                    }}
+                  />
+                ))
+              )}
+            </ScrollArea>
+          </div>
 
-              {/* Subject */}
-              <div>
-                <h3 className="font-semibold text-lg">
-                  {currentConversation.title || 'No subject'}
-                </h3>
+          {/* Right: Detail + Decision */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {isLoading ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="animate-pulse text-muted-foreground">Loading...</div>
               </div>
-
-              {/* Preview */}
-              <div className="bg-muted/50 rounded-lg p-4 max-h-48 overflow-y-auto">
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                  {currentConversation.messages[0]?.body?.substring(0, 500) || 
-                   currentConversation.summary_for_human || 
-                   'No preview available'}
-                  {(currentConversation.messages[0]?.body?.length || 0) > 500 && '...'}
-                </p>
-              </div>
-
-              {/* BizzyBee's decision */}
-              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles className="h-4 w-4 text-purple-500" />
-                  <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
-                    BizzyBee thinks:
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge className={bucketColors[currentConversation.decision_bucket] || 'bg-gray-500'}>
-                    {bucketLabels[currentConversation.decision_bucket] || currentConversation.decision_bucket}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">
-                    {currentConversation.why_this_needs_you || 'No explanation provided'}
-                  </span>
-                </div>
-                {currentConversation.triage_confidence && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Confidence: {Math.round(currentConversation.triage_confidence * 100)}%
-                  </p>
-                )}
-              </div>
-
-              {/* Teach BizzyBee More - Collapsible */}
-              <Collapsible open={showTeachMore} onOpenChange={setShowTeachMore}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" className="w-full justify-between text-muted-foreground hover:text-foreground">
-                    <span className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      Teach BizzyBee more (optional)
+            ) : currentConversation ? (
+              <div className="flex-1 flex flex-col overflow-y-auto p-6">
+                <Card className="flex-1 flex flex-col max-w-3xl mx-auto w-full p-6">
+                  {/* Sender info */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      {currentConversation.channel && (
+                        <ChannelIcon channel={currentConversation.channel} className="h-4 w-4" />
+                      )}
+                      <div>
+                        <p className="font-medium">
+                          {currentConversation.customer?.name || 'Unknown Sender'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {currentConversation.customer?.email || 'No email'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {format(new Date(currentConversation.created_at), 'MMM d, h:mm a')}
                     </span>
-                    {showTeachMore ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-4 pt-4">
-                  <div className="bg-muted/30 rounded-lg p-4 space-y-4">
-                    {senderDomain && (
-                      <p className="text-sm font-medium text-muted-foreground">
-                        For emails from @{senderDomain}:
+                  </div>
+
+                  {/* Subject */}
+                  <h3 className="font-semibold text-lg mb-4">
+                    {currentConversation.title || 'No subject'}
+                  </h3>
+
+                  {/* Preview */}
+                  <div className="bg-muted/50 rounded-lg p-4 mb-4 flex-1 max-h-48 overflow-y-auto">
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {currentConversation.messages[0]?.body?.substring(0, 500) || 
+                       currentConversation.summary_for_human || 
+                       'No preview available'}
+                      {(currentConversation.messages[0]?.body?.length || 0) > 500 && '...'}
+                    </p>
+                  </div>
+
+                  {/* BizzyBee's decision */}
+                  <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800 mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles className="h-4 w-4 text-purple-500" />
+                      <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                        BizzyBee thinks:
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge className={bucketColors[currentConversation.decision_bucket] || 'bg-gray-500'}>
+                        {bucketLabels[currentConversation.decision_bucket] || currentConversation.decision_bucket}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {currentConversation.why_this_needs_you || 'No explanation provided'}
+                      </span>
+                    </div>
+                    {currentConversation.triage_confidence && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Confidence: {Math.round(currentConversation.triage_confidence * 100)}%
                       </p>
                     )}
-                    
-                    {/* Automation Level */}
-                    <div className="space-y-3">
-                      <Label className="text-sm font-medium">How should BizzyBee handle these?</Label>
-                      <RadioGroup 
-                        value={automationLevel} 
-                        onValueChange={(val) => setAutomationLevel(val as AutomationLevel)}
-                        className="space-y-2"
-                      >
-                        <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
-                          <RadioGroupItem value="auto" id="auto" />
-                          <Label htmlFor="auto" className="flex items-center gap-2 cursor-pointer font-normal">
-                            <Bot className="h-4 w-4 text-green-500" />
-                            Always auto-handle (don't bother me)
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
-                          <RadioGroupItem value="draft_first" id="draft_first" />
-                          <Label htmlFor="draft_first" className="flex items-center gap-2 cursor-pointer font-normal">
-                            <FileEdit className="h-4 w-4 text-amber-500" />
-                            Draft replies but ask me first
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
-                          <RadioGroupItem value="always_review" id="always_review" />
-                          <Label htmlFor="always_review" className="flex items-center gap-2 cursor-pointer font-normal">
-                            <Eye className="h-4 w-4 text-blue-500" />
-                            Always show in Review first
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-
-                    {/* Tone Preference */}
-                    <div className="space-y-3 pt-2 border-t border-border/50">
-                      <Label className="text-sm font-medium">Tone preference:</Label>
-                      <RadioGroup 
-                        value={tonePreference} 
-                        onValueChange={(val) => setTonePreference(val as TonePreference)}
-                        className="flex flex-wrap gap-4"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="keep_current" id="keep_current" />
-                          <Label htmlFor="keep_current" className="cursor-pointer font-normal">Keep current</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="more_formal" id="more_formal" />
-                          <Label htmlFor="more_formal" className="cursor-pointer font-normal">More formal</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="more_brief" id="more_brief" />
-                          <Label htmlFor="more_brief" className="cursor-pointer font-normal">More brief</Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
 
-              {/* Actions */}
-              <div className="flex items-center gap-3 pt-2">
-                {!showChangePicker ? (
-                  <>
-                    <Button 
-                      onClick={handleConfirm}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                      disabled={reviewMutation.isPending}
-                    >
-                      <Check className="h-4 w-4 mr-2" />
-                      Looks right
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={() => setShowChangePicker(true)}
-                      className="flex-1"
-                      disabled={reviewMutation.isPending}
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Handle differently
-                    </Button>
-                  </>
-                ) : (
-                  <div className="flex-1 space-y-3">
-                    <p className="text-sm font-medium">Where should this go?</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="outline"
-                        className="justify-start"
-                        onClick={() => handleChange('act_now')}
-                        disabled={reviewMutation.isPending}
-                      >
-                        <span className="w-2 h-2 rounded-full bg-destructive mr-2" />
-                        To Reply (Urgent)
+                  {/* Teach BizzyBee More - Collapsible */}
+                  <Collapsible open={showTeachMore} onOpenChange={setShowTeachMore} className="mb-4">
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" className="w-full justify-between text-muted-foreground hover:text-foreground">
+                        <span className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4" />
+                          Teach BizzyBee more (optional)
+                        </span>
+                        {showTeachMore ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
                       </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-4 pt-4">
+                      <div className="bg-muted/30 rounded-lg p-4 space-y-4">
+                        {senderDomain && (
+                          <p className="text-sm font-medium text-muted-foreground">
+                            For emails from @{senderDomain}:
+                          </p>
+                        )}
+                        
+                        {/* Automation Level */}
+                        <div className="space-y-3">
+                          <Label className="text-sm font-medium">How should BizzyBee handle these?</Label>
+                          <RadioGroup 
+                            value={automationLevel} 
+                            onValueChange={(val) => setAutomationLevel(val as AutomationLevel)}
+                            className="space-y-2"
+                          >
+                            <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
+                              <RadioGroupItem value="auto" id="auto" />
+                              <Label htmlFor="auto" className="flex items-center gap-2 cursor-pointer font-normal">
+                                <Bot className="h-4 w-4 text-green-500" />
+                                Always auto-handle (don't bother me)
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
+                              <RadioGroupItem value="draft_first" id="draft_first" />
+                              <Label htmlFor="draft_first" className="flex items-center gap-2 cursor-pointer font-normal">
+                                <FileEdit className="h-4 w-4 text-amber-500" />
+                                Draft replies but ask me first
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
+                              <RadioGroupItem value="always_review" id="always_review" />
+                              <Label htmlFor="always_review" className="flex items-center gap-2 cursor-pointer font-normal">
+                                <Eye className="h-4 w-4 text-blue-500" />
+                                Always show in Review first
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+
+                        {/* Tone Preference */}
+                        <div className="space-y-3 pt-2 border-t border-border/50">
+                          <Label className="text-sm font-medium">Tone preference:</Label>
+                          <RadioGroup 
+                            value={tonePreference} 
+                            onValueChange={(val) => setTonePreference(val as TonePreference)}
+                            className="flex flex-wrap gap-4"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="keep_current" id="keep_current" />
+                              <Label htmlFor="keep_current" className="cursor-pointer font-normal">Keep current</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="more_formal" id="more_formal" />
+                              <Label htmlFor="more_formal" className="cursor-pointer font-normal">More formal</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="more_brief" id="more_brief" />
+                              <Label htmlFor="more_brief" className="cursor-pointer font-normal">More brief</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-3 pt-2">
+                    {!showChangePicker ? (
+                      <>
+                        <Button 
+                          onClick={handleConfirm}
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                          disabled={reviewMutation.isPending}
+                        >
+                          <Check className="h-4 w-4 mr-2" />
+                          Looks right
+                          <span className="ml-2 text-xs opacity-70">(L)</span>
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          onClick={() => setShowChangePicker(true)}
+                          className="flex-1"
+                          disabled={reviewMutation.isPending}
+                        >
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Handle differently
+                          <span className="ml-2 text-xs opacity-70">(H)</span>
+                        </Button>
+                      </>
+                    ) : (
+                      <div className="flex-1 space-y-3">
+                        <p className="text-sm font-medium">Where should this go?</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant="outline"
+                            className="justify-start"
+                            onClick={() => handleChange('act_now')}
+                            disabled={reviewMutation.isPending}
+                          >
+                            <span className="w-2 h-2 rounded-full bg-red-500 mr-2" />
+                            Needs attention
+                            <span className="ml-auto text-xs opacity-50">(1)</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="justify-start"
+                            onClick={() => handleChange('quick_win')}
+                            disabled={reviewMutation.isPending}
+                          >
+                            <span className="w-2 h-2 rounded-full bg-amber-500 mr-2" />
+                            Needs reply
+                            <span className="ml-auto text-xs opacity-50">(2)</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="justify-start"
+                            onClick={() => handleChange('wait')}
+                            disabled={reviewMutation.isPending}
+                          >
+                            <span className="w-2 h-2 rounded-full bg-slate-500 mr-2" />
+                            FYI
+                            <span className="ml-auto text-xs opacity-50">(3)</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="justify-start"
+                            onClick={() => handleChange('auto_handled')}
+                            disabled={reviewMutation.isPending}
+                          >
+                            <span className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+                            Done
+                            <span className="ml-auto text-xs opacity-50">(4)</span>
+                          </Button>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowChangePicker(false)}
+                          className="w-full"
+                        >
+                          Cancel (Esc)
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Skip option */}
+                  {!showChangePicker && currentIndex < reviewQueue.length - 1 && (
+                    <div className="text-center mt-4">
                       <Button
-                        variant="outline"
-                        className="justify-start"
-                        onClick={() => handleChange('quick_win')}
-                        disabled={reviewMutation.isPending}
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSkip}
+                        className="text-muted-foreground"
                       >
-                        <span className="w-2 h-2 rounded-full bg-amber-500 mr-2" />
-                        To Reply (Quick)
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="justify-start"
-                        onClick={() => handleChange('wait')}
-                        disabled={reviewMutation.isPending}
-                      >
-                        <span className="w-2 h-2 rounded-full bg-blue-500 mr-2" />
-                        FYI
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="justify-start"
-                        onClick={() => handleChange('auto_handled')}
-                        disabled={reviewMutation.isPending}
-                      >
-                        <span className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-                        Done (Auto)
+                        <SkipForward className="h-4 w-4 mr-2" />
+                        Skip for now
+                        <span className="ml-2 text-xs opacity-70">(S)</span>
                       </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowChangePicker(false)}
-                      className="w-full"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                )}
+                  )}
+                </Card>
               </div>
-
-              {/* Skip option */}
-              {!showChangePicker && currentIndex < reviewQueue.length - 1 && (
-                <div className="text-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleSkip}
-                    className="text-muted-foreground"
-                  >
-                    <SkipForward className="h-4 w-4 mr-2" />
-                    Skip for now
-                  </Button>
-                </div>
-              )}
-            </Card>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
