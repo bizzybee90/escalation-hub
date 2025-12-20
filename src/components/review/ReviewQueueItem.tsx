@@ -1,0 +1,76 @@
+import { Badge } from '@/components/ui/badge';
+import { Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ChannelIcon } from '@/components/shared/ChannelIcon';
+
+interface ReviewQueueItemProps {
+  conversation: {
+    id: string;
+    title: string | null;
+    decision_bucket: string;
+    customer: { name: string; email: string } | null;
+    channel?: string;
+  };
+  isActive: boolean;
+  isReviewed: boolean;
+  onClick: () => void;
+}
+
+const getStateBadge = (bucket: string) => {
+  switch (bucket) {
+    case 'act_now':
+      return <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4">Needs attention</Badge>;
+    case 'quick_win':
+      return <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 text-[9px] px-1 py-0 h-4">Needs reply</Badge>;
+    case 'wait':
+      return <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-[9px] px-1 py-0 h-4">FYI</Badge>;
+    case 'auto_handled':
+      return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 text-[9px] px-1 py-0 h-4">Done</Badge>;
+    default:
+      return null;
+  }
+};
+
+export const ReviewQueueItem = ({ conversation, isActive, isReviewed, onClick }: ReviewQueueItemProps) => {
+  const senderName = conversation.customer?.name || conversation.customer?.email?.split('@')[0] || 'Unknown';
+
+  return (
+    <div
+      onClick={onClick}
+      className={cn(
+        "px-3 py-2 cursor-pointer border-b border-border/30 transition-all",
+        "hover:bg-muted/50",
+        isActive && "bg-primary/10 border-l-2 border-l-primary",
+        isReviewed && "opacity-60"
+      )}
+    >
+      <div className="flex items-center gap-2">
+        {/* Reviewed check */}
+        {isReviewed && (
+          <Check className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+        )}
+        
+        {/* Channel icon */}
+        {conversation.channel && !isReviewed && (
+          <ChannelIcon channel={conversation.channel} className="h-3 w-3 flex-shrink-0" />
+        )}
+
+        {/* Sender name */}
+        <span className={cn(
+          "text-sm truncate flex-1",
+          isActive ? "font-medium text-foreground" : "text-foreground/80"
+        )}>
+          {senderName}
+        </span>
+
+        {/* State badge */}
+        {getStateBadge(conversation.decision_bucket)}
+      </div>
+
+      {/* Subject - truncated */}
+      <p className="text-xs text-muted-foreground truncate mt-0.5 pl-5">
+        {conversation.title || 'No subject'}
+      </p>
+    </div>
+  );
+};
