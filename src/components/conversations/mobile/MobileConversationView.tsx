@@ -256,25 +256,8 @@ export const MobileConversationView = ({
           </h1>
         </div>
 
-        {/* Status badges below header */}
+        {/* Minimal badges - only show critical info */}
         <div className="px-4 pb-2 flex flex-wrap gap-1.5">
-          <Badge variant="outline" className="capitalize text-[10px] h-5 px-2">
-            {conversation.channel}
-          </Badge>
-          {conversation.priority && (
-            <Badge
-              variant={
-                conversation.priority === 'high'
-                  ? 'destructive'
-                  : conversation.priority === 'medium'
-                  ? 'secondary'
-                  : 'outline'
-              }
-              className="uppercase text-[10px] h-5 px-2"
-            >
-              {conversation.priority}
-            </Badge>
-          )}
           {isOverdue && (
             <Badge variant="destructive" className="text-[10px] h-5 px-2">
               OVERDUE
@@ -285,15 +268,6 @@ export const MobileConversationView = ({
               VIP
             </Badge>
           )}
-          <Badge variant="outline" className="text-[10px] h-5 px-2">
-            {Math.round((conversation.ai_confidence || 0) * 100)}%
-          </Badge>
-          <Badge variant="outline" className="text-[10px] h-5 px-2">
-            {getSentimentEmoji(conversation.ai_sentiment)} {conversation.ai_sentiment || 'Unknown'}
-          </Badge>
-          <Badge variant="outline" className="capitalize text-[10px] h-5 px-2">
-            📂 {conversation.category || 'General'}
-          </Badge>
         </div>
       </div>
 
