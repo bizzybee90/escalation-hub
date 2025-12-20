@@ -1,5 +1,4 @@
 import { Conversation } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SLABadge } from '../sla/SLABadge';
 import { ChevronLeft } from 'lucide-react';
@@ -11,21 +10,7 @@ interface ConversationHeaderProps {
   onBack?: () => void;
 }
 
-const PriorityBadge = ({ priority }: { priority: string | null }) => {
-  const variants: Record<string, { emoji: string; className: string }> = {
-    high: { emoji: '🔴', className: 'bg-destructive/10 text-destructive border-destructive/20' },
-    medium: { emoji: '🟡', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20' },
-    low: { emoji: '🟢', className: 'bg-success/10 text-success border-success/20' },
-  };
-
-  const variant = variants[priority || 'medium'];
-  
-  return (
-    <Badge variant="outline" className={`${variant.className} text-xs font-medium`}>
-      {variant.emoji} {priority || 'medium'}
-    </Badge>
-  );
-};
+// Priority badge removed - state is now shown via bucket labels in the inbox
 
 const getListName = (pathname: string): string => {
   if (pathname.includes('my-tickets')) return 'My Tickets';
@@ -60,10 +45,7 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack }: Conversat
           )}
         </div>
         
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <SLABadge conversation={conversation} />
-          <PriorityBadge priority={conversation.priority} />
-        </div>
+        <SLABadge conversation={conversation} />
       </div>
     </div>
   );

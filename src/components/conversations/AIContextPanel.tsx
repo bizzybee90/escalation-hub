@@ -185,25 +185,7 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
         </Card>
       )}
 
-      {/* Metadata - Hidden on mobile */}
-      {!isMobile && (
-        <div className="grid grid-cols-3 gap-2 md:gap-2">
-          <Card className="p-3 md:p-3 text-center card-elevation mobile-native-card mobile-spring-bounce">
-            <div className="text-2xl md:text-2xl font-bold text-primary">{Math.round((conversation.ai_confidence || 0) * 100)}%</div>
-            <div className="text-xs text-muted-foreground mt-1">Confidence</div>
-          </Card>
-          
-          <Card className="p-3 md:p-3 text-center card-elevation mobile-native-card mobile-spring-bounce">
-            <div className="text-2xl md:text-2xl">{getSentimentEmoji(conversation.ai_sentiment)}</div>
-            <div className="text-xs text-muted-foreground mt-1 capitalize">{conversation.ai_sentiment || 'Unknown'}</div>
-          </Card>
-          
-          <Card className="p-3 md:p-3 text-center card-elevation mobile-native-card mobile-spring-bounce">
-            <div className="text-2xl md:text-2xl">📂</div>
-            <div className="text-xs text-muted-foreground mt-1 capitalize">{conversation.category || 'General'}</div>
-          </Card>
-        </div>
-      )}
+      {/* AI metadata removed - these internal metrics don't help users act */}
     </div>
   );
 };
