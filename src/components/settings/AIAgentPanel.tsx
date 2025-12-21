@@ -102,7 +102,7 @@ export const AIAgentPanel = () => {
 
     try {
       let offset = 0;
-      const batchSize = 100;
+      const batchSize = skipLLM ? 100 : 10;
       let hasMore = true;
       let processedTotal = 0;
       let changedTotal = 0;
