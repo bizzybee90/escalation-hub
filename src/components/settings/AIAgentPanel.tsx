@@ -59,6 +59,8 @@ export const AIAgentPanel = () => {
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [reanalyzeProgress, setReanalyzeProgress] = useState(0);
   const [reanalyzeStatus, setReanalyzeStatus] = useState<string | null>(null);
+  const [totalProcessed, setTotalProcessed] = useState(0);
+  const [totalChanged, setTotalChanged] = useState(0);
 
   // Fetch count of untriaged conversations
   const { data: untriagedCount = 0, refetch: refetchUntriaged } = useQuery({
@@ -75,34 +77,74 @@ export const AIAgentPanel = () => {
     enabled: !!workspace?.id,
   });
 
-  const handleReanalyze = async (dryRun = false, skipLLM = false) => {
+  // Fetch total conversation count for progress
+  const { data: totalConversations = 0 } = useQuery({
+    queryKey: ['total-conversations', workspace?.id],
+    queryFn: async () => {
+      if (!workspace?.id) return 0;
+      const { count } = await supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspace.id);
+      return count || 0;
+    },
+    enabled: !!workspace?.id,
+  });
+
+  const handleReanalyze = async (dryRun = false, skipLLM = false, runAll = false) => {
     if (!workspace?.id) return;
 
     setIsReanalyzing(true);
     setReanalyzeProgress(0);
+    setTotalProcessed(0);
+    setTotalChanged(0);
     setReanalyzeStatus(dryRun ? 'Previewing changes...' : 'Analyzing emails...');
 
     try {
-      const { data, error } = await supabase.functions.invoke('bulk-retriage-conversations', {
-        body: {
-          workspaceId: workspace.id,
-          limit: 100,
-          dryRun,
-          skipLLM,
-        },
-      });
+      let offset = 0;
+      const batchSize = 100;
+      let hasMore = true;
+      let processedTotal = 0;
+      let changedTotal = 0;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase.functions.invoke('bulk-retriage-conversations', {
+          body: {
+            workspaceId: workspace.id,
+            limit: batchSize,
+            offset,
+            dryRun,
+            skipLLM,
+          },
+        });
+
+        if (error) throw error;
+
+        processedTotal += data.processed || 0;
+        changedTotal += data.changed || 0;
+        setTotalProcessed(processedTotal);
+        setTotalChanged(changedTotal);
+        setReanalyzeProgress(Math.min(95, (processedTotal / Math.max(totalConversations, 1)) * 100));
+        setReanalyzeStatus(`Processed ${processedTotal} emails...`);
+
+        // If we processed fewer than batchSize, we're done
+        // Or if runAll is false, only do one batch
+        if ((data.processed || 0) < batchSize || !runAll) {
+          hasMore = false;
+        } else {
+          offset += batchSize;
+        }
+      }
 
       if (dryRun) {
         toast({
           title: 'Preview Complete',
-          description: `Would update ${data.processed || 0} conversations`,
+          description: `Would update ${changedTotal} of ${processedTotal} conversations`,
         });
       } else {
         toast({
           title: 'Re-analysis Complete',
-          description: `Processed ${data.processed || 0} emails: ${data.updated || 0} updated, ${data.skipped || 0} skipped`,
+          description: `Processed ${processedTotal} emails, ${changedTotal} updated`,
         });
         refetchUntriaged();
       }
@@ -122,7 +164,9 @@ export const AIAgentPanel = () => {
         setIsReanalyzing(false);
         setReanalyzeProgress(0);
         setReanalyzeStatus(null);
-      }, 2000);
+        setTotalProcessed(0);
+        setTotalChanged(0);
+      }, 3000);
     }
   };
 
@@ -485,13 +529,14 @@ export const AIAgentPanel = () => {
             Re-Analyze Historical Emails
           </CardTitle>
           <CardDescription>
-            {untriagedCount > 0 ? (
+            {totalConversations > 0 ? (
               <span className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                {untriagedCount.toLocaleString()} emails haven't been properly analyzed yet
+                {untriagedCount > 0 && <AlertTriangle className="h-4 w-4 text-amber-500" />}
+                {totalConversations.toLocaleString()} total emails
+                {untriagedCount > 0 && ` (${untriagedCount.toLocaleString()} not yet analyzed)`}
               </span>
             ) : (
-              'All emails have been analyzed'
+              'No emails to analyze'
             )}
           </CardDescription>
         </CardHeader>
@@ -499,38 +544,41 @@ export const AIAgentPanel = () => {
           {isReanalyzing && (
             <div className="space-y-2">
               <Progress value={reanalyzeProgress} className="h-2" />
-              <p className="text-sm text-muted-foreground">{reanalyzeStatus}</p>
+              <p className="text-sm text-muted-foreground">
+                {reanalyzeStatus} {totalProcessed > 0 && `(${totalChanged} changed)`}
+              </p>
             </div>
           )}
 
           <div className="flex flex-wrap gap-2">
             <Button 
-              onClick={() => handleReanalyze(false, true)} 
-              disabled={isReanalyzing || untriagedCount === 0}
+              onClick={() => handleReanalyze(false, true, true)} 
+              disabled={isReanalyzing || totalConversations === 0}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isReanalyzing ? 'animate-spin' : ''}`} />
-              {isReanalyzing ? 'Analyzing...' : 'Apply Sender Rules Only'}
+              {isReanalyzing ? 'Analyzing...' : 'Apply Sender Rules (All)'}
             </Button>
             <Button 
               variant="outline"
-              onClick={() => handleReanalyze(false, false)} 
-              disabled={isReanalyzing || untriagedCount === 0}
+              onClick={() => handleReanalyze(false, false, true)} 
+              disabled={isReanalyzing || totalConversations === 0}
             >
               <Sparkles className="h-4 w-4 mr-2" />
-              Full AI Re-Analysis
+              Full AI Re-Analysis (All)
             </Button>
             <Button 
               variant="ghost"
-              onClick={() => handleReanalyze(true, false)} 
-              disabled={isReanalyzing || untriagedCount === 0}
+              onClick={() => handleReanalyze(true, false, false)} 
+              disabled={isReanalyzing || totalConversations === 0}
             >
-              Preview Changes
+              Preview (100)
             </Button>
           </div>
 
           <p className="text-xs text-muted-foreground">
             <strong>Sender Rules Only:</strong> Fast - applies existing rules without AI calls<br />
-            <strong>Full AI Re-Analysis:</strong> Thorough - uses AI to classify each email (slower, uses API credits)
+            <strong>Full AI Re-Analysis:</strong> Thorough - uses AI to classify each email (slower, uses API credits)<br />
+            <strong>All:</strong> Processes entire inbox in batches of 100
           </p>
         </CardContent>
       </Card>

@@ -23,7 +23,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { workspaceId, limit = 50, dryRun = false, skipLLM = true } = await req.json();
+    const { workspaceId, limit = 50, offset = 0, dryRun = false, skipLLM = true } = await req.json();
 
     if (!workspaceId) {
       return new Response(JSON.stringify({ error: 'workspaceId required' }), {
@@ -32,7 +32,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[bulk-retriage] Starting for workspace ${workspaceId}, limit=${limit}, dryRun=${dryRun}, skipLLM=${skipLLM}`);
+    console.log(`[bulk-retriage] Starting for workspace ${workspaceId}, limit=${limit}, offset=${offset}, dryRun=${dryRun}, skipLLM=${skipLLM}`);
 
     // Fetch sender rules for this workspace
     const { data: senderRules } = await supabase
@@ -43,7 +43,7 @@ serve(async (req) => {
 
     console.log(`[bulk-retriage] Found ${senderRules?.length || 0} sender rules`);
 
-    // Fetch conversations needing retriage (no email_classification or decision_bucket is default)
+    // Fetch conversations for retriage
     const { data: conversations, error: convError } = await supabase
       .from('conversations')
       .select(`
@@ -56,9 +56,8 @@ serve(async (req) => {
         messages(body, direction)
       `)
       .eq('workspace_id', workspaceId)
-      .or('email_classification.is.null,decision_bucket.eq.quick_win')
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .range(offset, offset + limit - 1);
 
     if (convError) {
       console.error('[bulk-retriage] Error fetching conversations:', convError);
