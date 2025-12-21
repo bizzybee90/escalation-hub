@@ -25,6 +25,9 @@ serve(async (req) => {
 
     const { workspaceId, limit = 50, offset = 0, dryRun = false, skipLLM = true } = await req.json();
 
+    // In AI mode, keep batches small to avoid function timeouts.
+    const effectiveLimit = !skipLLM ? Math.min(limit, 10) : limit;
+
     if (!workspaceId) {
       return new Response(JSON.stringify({ error: 'workspaceId required' }), {
         status: 400,
@@ -32,7 +35,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[bulk-retriage] Starting for workspace ${workspaceId}, limit=${limit}, offset=${offset}, dryRun=${dryRun}, skipLLM=${skipLLM}`);
+    console.log(`[bulk-retriage] Starting for workspace ${workspaceId}, limit=${effectiveLimit}, offset=${offset}, dryRun=${dryRun}, skipLLM=${skipLLM}`);
 
     // Fetch sender rules for this workspace
     const { data: senderRules } = await supabase
@@ -57,7 +60,7 @@ serve(async (req) => {
       `)
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .range(offset, offset + effectiveLimit - 1);
 
     if (convError) {
       console.error('[bulk-retriage] Error fetching conversations:', convError);
