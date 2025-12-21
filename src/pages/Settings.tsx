@@ -3,7 +3,6 @@ import { DataExportPanel } from '@/components/settings/DataExportPanel';
 import { DataDeletionPanel } from '@/components/settings/DataDeletionPanel';
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
 import { RetentionPolicyPanel } from '@/components/settings/RetentionPolicyPanel';
-import { InterfaceModeToggle } from '@/components/settings/InterfaceModeToggle';
 import { TestDataCleanupPanel } from '@/components/settings/TestDataCleanupPanel';
 import { GDPRDashboard } from '@/components/settings/GDPRDashboard';
 import { CustomerMergePanel } from '@/components/settings/CustomerMergePanel';
@@ -37,7 +36,6 @@ export default function Settings() {
         <div className="overflow-x-auto pb-2 -mx-4 px-4">
           <TabsList className="inline-flex w-auto min-w-full">
             <TabsTrigger value="dashboard" className="text-xs md:text-sm">Dashboard</TabsTrigger>
-            <TabsTrigger value="interface" className="text-xs md:text-sm">Interface</TabsTrigger>
             <TabsTrigger value="ordering" className="text-xs md:text-sm">Ordering</TabsTrigger>
             <TabsTrigger value="ai-agent" className="text-xs md:text-sm">AI Agent</TabsTrigger>
             <TabsTrigger value="testing" className="flex items-center gap-2 text-xs md:text-sm">
@@ -67,10 +65,6 @@ export default function Settings() {
             <AIActivityWidget />
             <RecentActivityWidget />
           </div>
-        </TabsContent>
-
-        <TabsContent value="interface" className="space-y-4">
-          <InterfaceModeToggle />
         </TabsContent>
 
         <TabsContent value="ordering">
