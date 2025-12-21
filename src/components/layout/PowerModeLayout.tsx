@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { JaceStyleInbox } from '@/components/conversations/JaceStyleInbox';
 import { ConversationThread } from '@/components/conversations/ConversationThread';
 import { CustomerContext } from '@/components/context/CustomerContext';
 import { Conversation } from '@/lib/types';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { MessageSquare } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface PowerModeLayoutProps {
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi';
@@ -15,6 +16,14 @@ interface PowerModeLayoutProps {
 export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerModeLayoutProps) => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => {
+    return localStorage.getItem('customerPanelCollapsed') === 'true';
+  });
+
+  // Persist right panel preference
+  useEffect(() => {
+    localStorage.setItem('customerPanelCollapsed', rightPanelCollapsed.toString());
+  }, [rightPanelCollapsed]);
 
   const handleUpdate = () => {
     setRefreshKey(prev => prev + 1);
@@ -61,9 +70,9 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
 
           {/* Conversation Thread Panel */}
           <ResizablePanel 
-            defaultSize={45} 
+            defaultSize={rightPanelCollapsed ? 60 : 45} 
             minSize={35}
-            maxSize={60}
+            maxSize={70}
             collapsible={false}
             className="w-full min-h-0 flex flex-col h-full min-w-0"
           >
@@ -77,20 +86,65 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
             </div>
           </ResizablePanel>
 
-          <ResizableHandle className="w-1 bg-border/50 hover:bg-border transition-colors hidden md:block" />
+          {/* Collapsed panel indicator - thin bar with expand button */}
+          {rightPanelCollapsed && (
+            <>
+              <ResizableHandle className="w-1 bg-border/50 hover:bg-border transition-colors hidden md:block" />
+              <ResizablePanel 
+                defaultSize={5} 
+                minSize={3}
+                maxSize={5}
+                collapsible={false}
+                className="hidden md:flex min-h-0"
+              >
+                <div className="w-full h-full border-l border-border bg-muted/50 flex flex-col items-center pt-4">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setRightPanelCollapsed(false)}
+                    className="h-8 w-8 bg-muted hover:bg-accent"
+                    title="Show customer panel"
+                  >
+                    <PanelRightOpen className="h-4 w-4" />
+                  </Button>
+                </div>
+              </ResizablePanel>
+            </>
+          )}
 
-          {/* Customer Context Panel */}
-          <ResizablePanel 
-            defaultSize={20} 
-            minSize={18}
-            maxSize={35}
-            collapsible={false}
-            className="hidden md:flex min-h-0"
-          >
-            <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-card/50 p-5 hidden md:flex min-w-0">
-              <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
-            </div>
-          </ResizablePanel>
+          {/* Customer Context Panel (when expanded) */}
+          {!rightPanelCollapsed && (
+            <>
+              <ResizableHandle className="w-1 bg-border/50 hover:bg-border transition-colors hidden md:block" />
+              <ResizablePanel 
+                defaultSize={20} 
+                minSize={18}
+                maxSize={35}
+                collapsible={false}
+                className="hidden md:flex min-h-0"
+              >
+                <div className="flex-1 flex flex-col overflow-hidden bg-card/50 min-w-0">
+                  {/* Fixed header with collapse button */}
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
+                    <span className="text-sm font-medium text-muted-foreground">Customer Info</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setRightPanelCollapsed(true)}
+                      className="h-7 w-7 hover:bg-accent"
+                      title="Hide customer panel"
+                    >
+                      <PanelRightClose className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {/* Scrollable content */}
+                  <div className="flex-1 overflow-y-auto p-5">
+                    <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
+                  </div>
+                </div>
+              </ResizablePanel>
+            </>
+          )}
         </ResizablePanelGroup>
       )}
     </div>

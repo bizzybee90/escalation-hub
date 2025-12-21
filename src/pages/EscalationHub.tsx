@@ -1,30 +1,15 @@
-import { useState, useEffect } from 'react';
-import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
+import { useState } from 'react';
 import { PowerModeLayout } from '@/components/layout/PowerModeLayout';
 import { TabletLayout } from '@/components/layout/TabletLayout';
-import { Sidebar } from '@/components/sidebar/Sidebar';
 import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
 import { MobileHeader } from '@/components/sidebar/MobileHeader';
-import { ConversationList } from '@/components/conversations/ConversationList';
-import { ConversationThread } from '@/components/conversations/ConversationThread';
-import { CustomerContext } from '@/components/context/CustomerContext';
-import { QuickActions } from '@/components/conversations/QuickActions';
 import { MobileQuickActions } from '@/components/conversations/MobileQuickActions';
 import { MobileConversationList } from '@/components/conversations/mobile/MobileConversationList';
 import { MobileConversationView } from '@/components/conversations/mobile/MobileConversationView';
-import { JaceStyleInbox } from '@/components/conversations/JaceStyleInbox';
-import { Conversation, Message } from '@/lib/types';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { useInterfaceMode } from '@/hooks/useInterfaceMode';
+import { Conversation } from '@/lib/types';
 import { useSLANotifications } from '@/hooks/useSLANotifications';
-import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useIsTablet } from '@/hooks/use-tablet';
-import { PanelRightClose, PanelRightOpen } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
 
 interface EscalationHubProps {
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi';
@@ -38,26 +23,12 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => {
-    return localStorage.getItem('customerPanelCollapsed') === 'true';
-  });
   const [sortBy, setSortBy] = useState<string>(() => {
     return localStorage.getItem('conversation-sort') || 'sla_urgent';
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { interfaceMode, loading: modeLoading } = useInterfaceMode();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
-
-  // Persist right panel preference
-  useEffect(() => {
-    localStorage.setItem('customerPanelCollapsed', rightPanelCollapsed.toString());
-  }, [rightPanelCollapsed]);
-
-  // Persist sort preference
-  useEffect(() => {
-    localStorage.setItem('conversation-sort', sortBy);
-  }, [sortBy]);
   
   useSLANotifications();
 
@@ -95,11 +66,6 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   // Tablet view (768px-1024px)
   if (isTablet) {
     return <TabletLayout filter={filter} />;
-  }
-
-  // Power Mode (desktop only)
-  if (!modeLoading && interfaceMode === 'power') {
-    return <PowerModeLayout filter={filter} />;
   }
 
   // Mobile view
@@ -154,76 +120,6 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
     );
   }
 
-  // Desktop view - Focus Mode
-  return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* Sidebar */}
-      <aside className="border-r border-border bg-card flex-shrink-0 overflow-y-auto">
-        <Sidebar onNavigate={handleClose} />
-      </aside>
-
-      {/* Main content area */}
-      {!selectedConversation ? (
-        /* Jace-style full-width inbox when no conversation selected */
-        <main className="flex-1 overflow-hidden">
-          <JaceStyleInbox
-            filter={filter}
-            onSelect={handleSelectConversation}
-          />
-        </main>
-      ) : (
-      /* Show conversation detail with customer context */
-      <main className="flex-1 flex overflow-hidden min-h-0 h-full">
-        {/* Conversation thread area */}
-        <div className="flex-1 overflow-hidden">
-          <ConversationThread
-            key={refreshKey}
-            conversation={selectedConversation}
-            onUpdate={handleUpdate}
-            onBack={handleClose}
-          />
-        </div>
-        
-        {/* Collapsed panel indicator - thin bar with expand button */}
-{rightPanelCollapsed && (
-          <div className="w-10 flex-shrink-0 border-l border-border bg-muted/50 flex flex-col items-center pt-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setRightPanelCollapsed(false)}
-              className="h-8 w-8 bg-muted hover:bg-accent"
-              title="Show customer panel"
-            >
-              <PanelRightOpen className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        {/* Right sidebar - Customer context & actions (when expanded) */}
-        {!rightPanelCollapsed && (
-          <aside className="w-[340px] flex-shrink-0 border-l border-border bg-card/50 flex flex-col h-full transition-all duration-200">
-            {/* Fixed header with collapse button - always visible */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
-              <span className="text-sm font-medium text-muted-foreground">Customer Info</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setRightPanelCollapsed(true)}
-                className="h-7 w-7 hover:bg-accent"
-                title="Hide customer panel"
-              >
-                <PanelRightClose className="h-4 w-4" />
-              </Button>
-            </div>
-            
-            {/* Scrollable content area */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
-              <CustomerContext key={selectedConversation.id} conversation={selectedConversation} onUpdate={handleUpdate} />
-            </div>
-          </aside>
-        )}
-      </main>
-      )}
-    </div>
-  );
+  // Desktop view - Single unified layout with collapsible panel
+  return <PowerModeLayout filter={filter} />;
 };
