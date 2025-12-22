@@ -21,6 +21,7 @@ const STEPS: Step[] = ['welcome', 'business', 'senders', 'triage', 'automation',
 export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
   const [businessContext, setBusinessContext] = useState({
+    companyName: '',
     businessType: '',
     isHiring: false,
     receivesInvoices: true,
