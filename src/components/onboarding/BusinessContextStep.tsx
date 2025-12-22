@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 interface BusinessContextStepProps {
   workspaceId: string;
   value: {
+    companyName: string;
     businessType: string;
     isHiring: boolean;
     receivesInvoices: boolean;
@@ -52,6 +53,7 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
         workspace_id: workspaceId,
         is_hiring: value.isHiring,
         custom_flags: {
+          company_name: value.companyName,
           business_type: value.businessType,
           receives_invoices: value.receivesInvoices,
           email_domain: value.emailDomain,
@@ -133,6 +135,18 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
       </div>
 
       <div className="space-y-4">
+        <div className="space-y-2">
+          <Label>Your company name</Label>
+          <Input
+            placeholder="e.g., MAC Cleaning"
+            value={value.companyName}
+            onChange={(e) => onChange({ ...value, companyName: e.target.value })}
+          />
+          <p className="text-xs text-muted-foreground">
+            Helps BizzyBee identify invoices TO your company vs misdirected ones
+          </p>
+        </div>
+
         <div className="space-y-2">
           <Label>What type of business is this?</Label>
           <Select

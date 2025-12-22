@@ -373,6 +373,34 @@ serve(async (req) => {
 
     console.log('Decision router processing email from:', email.from_email, 'subject:', email.subject);
 
+    // Fetch business context from database if not provided
+    let enrichedBusinessContext: any = business_context || {};
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+    if (workspace_id) {
+      const { data: dbContext } = await supabaseClient
+        .from('business_context')
+        .select('*')
+        .eq('workspace_id', workspace_id)
+        .single();
+
+      if (dbContext) {
+        const customFlags = dbContext.custom_flags as Record<string, any> || {};
+        enrichedBusinessContext = {
+          ...enrichedBusinessContext,
+          is_hiring: dbContext.is_hiring || enrichedBusinessContext.is_hiring,
+          active_dispute: dbContext.active_stripe_case || enrichedBusinessContext.active_dispute,
+          company_name: customFlags.company_name || '',
+          email_domain: customFlags.email_domain || '',
+          receives_invoices: customFlags.receives_invoices ?? true,
+          business_type: customFlags.business_type || '',
+        };
+        console.log('Loaded business context:', enrichedBusinessContext);
+      }
+    }
+
     // If sender rule exists, apply it directly with decision bucket mapping
     if (sender_rule) {
       const classification = sender_rule.override_classification || sender_rule.default_classification;
@@ -420,20 +448,34 @@ serve(async (req) => {
       });
     }
 
-    // Build context-aware prompt
+    // Build context-aware prompt with company identity
     let contextualPrompt = '';
-    if (business_context) {
-      if (business_context.is_hiring) {
-        contextualPrompt += '\n\nCONTEXT: The business is currently hiring. Job applications should go to WAIT bucket unless urgent.';
-      }
-      if (business_context.active_dispute) {
-        contextualPrompt += '\n\nCONTEXT: There is an active payment dispute. Payment processor emails = ACT_NOW with financial risk.';
-      }
-      if (business_context.vip_domains && business_context.vip_domains.length > 0) {
-        const senderDomain = email.from_email.split('@')[1]?.toLowerCase();
-        if (business_context.vip_domains.includes(senderDomain)) {
-          contextualPrompt += '\n\nCONTEXT: This sender is from a VIP customer domain. Treat as ACT_NOW with retention risk.';
-        }
+    
+    // Add company identity if available
+    if (enrichedBusinessContext.company_name || enrichedBusinessContext.email_domain) {
+      contextualPrompt += `\n\nCOMPANY IDENTITY:
+- Your company name: ${enrichedBusinessContext.company_name || 'Unknown'}
+- Your email domain: ${enrichedBusinessContext.email_domain || 'Unknown'}
+- Business type: ${enrichedBusinessContext.business_type || 'Service business'}
+- You ${enrichedBusinessContext.receives_invoices ? 'RECEIVE' : 'do NOT receive'} invoices from suppliers
+
+INVOICE CLASSIFICATION RULES:
+- Invoices TO ${enrichedBusinessContext.company_name || 'your company'} = supplier_invoice (legitimate, may need payment)
+- Invoices FROM ${enrichedBusinessContext.company_name || 'your company'} or ${enrichedBusinessContext.email_domain || 'your domain'} = receipt_confirmation (already sent)
+- Invoices for a DIFFERENT company entirely = misdirected (wrong recipient)
+- Check if the invoice mentions "${enrichedBusinessContext.company_name}" or services you provide before marking as misdirected`;
+    }
+
+    if (enrichedBusinessContext.is_hiring) {
+      contextualPrompt += '\n\nCONTEXT: The business is currently hiring. Job applications should go to WAIT bucket unless urgent.';
+    }
+    if (enrichedBusinessContext.active_dispute) {
+      contextualPrompt += '\n\nCONTEXT: There is an active payment dispute. Payment processor emails = ACT_NOW with financial risk.';
+    }
+    if (enrichedBusinessContext.vip_domains && enrichedBusinessContext.vip_domains.length > 0) {
+      const senderDomain = email.from_email.split('@')[1]?.toLowerCase();
+      if (enrichedBusinessContext.vip_domains.includes(senderDomain)) {
+        contextualPrompt += '\n\nCONTEXT: This sender is from a VIP customer domain. Treat as ACT_NOW with retention risk.';
       }
     }
 
