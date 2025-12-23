@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Send, Loader2, User, Bot, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CategoryLabel } from '@/components/shared/CategoryLabel';
 
 interface Message {
   id: string;
@@ -170,19 +171,7 @@ export function DraftPreviewSheet({
           <SheetTitle className="flex items-center justify-between gap-2">
             <span className="truncate">{conversation?.title || 'Loading...'}</span>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {conversation?.email_classification && (
-                <Badge variant="outline" className={cn(
-                  "text-xs",
-                  conversation.email_classification.includes('payment') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                  conversation.email_classification.includes('marketing') ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                  conversation.email_classification.includes('invoice') ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                  conversation.email_classification.includes('enquiry') ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
-                  conversation.email_classification.includes('complaint') ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                  ''
-                )}>
-                  {conversation.email_classification.replace(/_/g, ' ')}
-                </Badge>
-              )}
+              <CategoryLabel classification={conversation?.email_classification} size="sm" />
               {conversation?.urgency && (
                 <Badge variant={conversation.urgency === 'high' ? 'destructive' : 'secondary'}>
                   {conversation.urgency}
