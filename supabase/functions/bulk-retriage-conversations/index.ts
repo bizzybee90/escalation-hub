@@ -44,7 +44,7 @@ serve(async (req) => {
     const limit = (body.limit as number) || 20;
     const dryRun = (body.dryRun as boolean) || false;
     const confidenceThreshold = (body.confidenceThreshold as number) || 0.85;
-    const targetBucket = (body.targetBucket as string) || 'auto_handled';
+    const targetBuckets = (body.targetBuckets as string[]) || ['auto_handled', 'quick_win', 'act_now', 'wait'];
 
     if (!workspaceId) {
       return new Response(JSON.stringify({ error: 'workspaceId required' }), {
@@ -53,7 +53,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[bulk-retriage] Starting workspace=${workspaceId} limit=${limit} dryRun=${dryRun} threshold=${confidenceThreshold} targetBucket=${targetBucket}`);
+    console.log(`[bulk-retriage] Starting workspace=${workspaceId} limit=${limit} dryRun=${dryRun} threshold=${confidenceThreshold} targetBuckets=${targetBuckets.join(',')}`)
 
     // Find conversations that were auto-handled with low confidence
     // These are the ones most likely to be misclassified
@@ -72,7 +72,7 @@ serve(async (req) => {
         messages(body, direction, raw_payload)
       `)
       .eq('workspace_id', workspaceId)
-      .eq('decision_bucket', targetBucket)
+      .in('decision_bucket', targetBuckets)
       .or(`triage_confidence.lt.${confidenceThreshold},triage_confidence.is.null`)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -82,14 +82,14 @@ serve(async (req) => {
       throw convError;
     }
 
-    console.log(`[bulk-retriage] Found ${conversations?.length || 0} low-confidence ${targetBucket} conversations`);
+    console.log(`[bulk-retriage] Found ${conversations?.length || 0} low-confidence conversations across buckets: ${targetBuckets.join(',')}`);
 
     if (!conversations || conversations.length === 0) {
       return new Response(JSON.stringify({
         processed: 0,
         changed: 0,
         dryRun,
-        message: `No low-confidence ${targetBucket} conversations found`,
+        message: `No low-confidence conversations found`,
         results: []
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -220,7 +220,7 @@ serve(async (req) => {
       errors: errorCount,
       dryRun,
       confidenceThreshold,
-      targetBucket,
+      targetBuckets,
       results,
     };
 

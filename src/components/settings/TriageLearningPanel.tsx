@@ -69,11 +69,12 @@ export function TriageLearningPanel() {
 
       if (!userData?.workspace_id) return;
 
+      // Count across all buckets, not just auto_handled
       const { count } = await supabase
         .from('conversations')
         .select('id', { count: 'exact', head: true })
         .eq('workspace_id', userData.workspace_id)
-        .eq('decision_bucket', 'auto_handled')
+        .in('decision_bucket', ['auto_handled', 'quick_win', 'act_now', 'wait'])
         .or(`triage_confidence.lt.${confidenceThreshold},triage_confidence.is.null`);
 
       setLowConfidenceCount(count || 0);
@@ -346,10 +347,10 @@ export function TriageLearningPanel() {
               <AlertCircle className="h-5 w-5 text-amber-500" />
               <div>
                 <p className="text-sm font-medium">
-                  {lowConfidenceCount} auto-handled emails with confidence below {Math.round(confidenceThreshold * 100)}%
+                  {lowConfidenceCount} emails with confidence below {Math.round(confidenceThreshold * 100)}%
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  These may include incorrectly classified invoices, receipts, or customer inquiries
+                  Includes all buckets - may contain misclassified invoices, receipts, or customer inquiries
                 </p>
               </div>
             </div>
