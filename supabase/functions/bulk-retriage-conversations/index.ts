@@ -25,13 +25,26 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { 
-      workspaceId, 
-      limit = 20, 
-      dryRun = false, 
-      confidenceThreshold = 0.85,
-      targetBucket = 'auto_handled' // Focus on auto-handled by default
-    } = await req.json();
+    // Parse body with better error handling
+    let body: Record<string, unknown> = {};
+    try {
+      const text = await req.text();
+      if (text && text.trim()) {
+        body = JSON.parse(text);
+      }
+    } catch (parseError) {
+      console.error('[bulk-retriage] Failed to parse request body:', parseError);
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const workspaceId = body.workspaceId as string | undefined;
+    const limit = (body.limit as number) || 20;
+    const dryRun = (body.dryRun as boolean) || false;
+    const confidenceThreshold = (body.confidenceThreshold as number) || 0.85;
+    const targetBucket = (body.targetBucket as string) || 'auto_handled';
 
     if (!workspaceId) {
       return new Response(JSON.stringify({ error: 'workspaceId required' }), {
