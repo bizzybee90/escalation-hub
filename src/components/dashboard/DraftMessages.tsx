@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DraftPreviewSheet } from './DraftPreviewSheet';
+import { CategoryLabel } from '@/components/shared/CategoryLabel';
 
 interface DraftMessage {
   id: string;
@@ -271,19 +272,7 @@ export function DraftMessages({ onNavigate, maxItems = 5 }: DraftMessagesProps) 
                     {draft.customerName || draft.title}
                   </p>
                   <div className="flex items-center gap-2">
-                    {draft.classification && (
-                      <span className={cn(
-                        "text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0",
-                        draft.classification.includes('payment') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                        draft.classification.includes('marketing') ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                        draft.classification.includes('invoice') ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                        draft.classification.includes('enquiry') ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
-                        draft.classification.includes('complaint') ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                        'bg-muted text-muted-foreground'
-                      )}>
-                        {draft.classification.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ').substring(0, 12)}
-                      </span>
-                    )}
+                    <CategoryLabel classification={draft.classification} size="xs" />
                     <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   </div>
                 </div>

@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
+import { CategoryLabel } from '@/components/shared/CategoryLabel';
+
 interface JaceStyleInboxProps {
   onSelect: (conversation: Conversation) => void;
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi';
@@ -231,8 +233,9 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
           </p>
         </div>
 
-        {/* State badge - single badge, no separate Draft badge */}
-        <div className="flex items-center gap-1 flex-shrink-0">
+        {/* Category + State badge */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <CategoryLabel classification={conv.email_classification} size="xs" />
           {stateConfig.badge}
         </div>
 

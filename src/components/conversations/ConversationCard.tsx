@@ -3,8 +3,9 @@ import { Conversation, DecisionBucket } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
-import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass, Star, Mail, Ban, Megaphone, Briefcase, Receipt, Settings2, Zap, Users, Package, Info, ThumbsUp, MessageCircle, CircleAlert, CircleCheck, CirclePause, Timer, RotateCcw, History } from 'lucide-react';
+import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass, Star, CircleAlert, CircleCheck, CirclePause, Timer, RotateCcw, History } from 'lucide-react';
 import { ChannelIcon } from '../shared/ChannelIcon';
+import { CategoryLabel } from '../shared/CategoryLabel';
 import { cn } from '@/lib/utils';
 import { useIsTablet } from '@/hooks/use-tablet';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -46,31 +47,6 @@ const getDecisionBucketBadge = (bucket: DecisionBucket | string | null | undefin
   };
   
   return badges[bucket] || null;
-};
-
-// Email classification badge helper - SECONDARY display
-const getClassificationBadge = (classification: string | null | undefined) => {
-  if (!classification) return null;
-  
-  const badges: Record<string, { icon: typeof Mail; label: string; className: string }> = {
-    customer_inquiry: { icon: Mail, label: 'Inquiry', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
-    customer_complaint: { icon: AlertTriangle, label: 'Complaint', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
-    customer_feedback: { icon: ThumbsUp, label: 'Feedback', className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' },
-    lead_new: { icon: UserPlus, label: 'New Lead', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
-    lead_followup: { icon: MessageCircle, label: 'Follow-up', className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
-    supplier_invoice: { icon: Receipt, label: 'Invoice', className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-    supplier_urgent: { icon: Zap, label: 'Supplier', className: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20' },
-    partner_request: { icon: Users, label: 'Partner', className: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
-    automated_notification: { icon: Bot, label: 'Auto', className: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
-    spam_phishing: { icon: Ban, label: 'Spam', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
-    marketing_newsletter: { icon: Megaphone, label: 'Marketing', className: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
-    recruitment_hr: { icon: Briefcase, label: 'Recruitment', className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
-    receipt_confirmation: { icon: Receipt, label: 'Receipt', className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-    internal_system: { icon: Settings2, label: 'System', className: 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20' },
-    informational_only: { icon: Info, label: 'Info', className: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20' },
-  };
-  
-  return badges[classification] || null;
 };
 
 interface ConversationCardProps {
@@ -392,17 +368,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
                 </Badge>
               )}
               {/* Category label next to status */}
-              {(() => {
-                const classificationBadge = getClassificationBadge(conversation.email_classification);
-                if (!classificationBadge) return null;
-                const ClassIcon = classificationBadge.icon;
-                return (
-                  <Badge variant="outline" className={cn("rounded-full text-sm px-3 py-1.5 border flex items-center gap-1.5", classificationBadge.className)}>
-                    <ClassIcon className="h-3.5 w-3.5" />
-                    {classificationBadge.label}
-                  </Badge>
-                );
-              })()}
+              <CategoryLabel classification={conversation.email_classification} size="md" />
             </div>
 
             {/* Title */}
@@ -551,17 +517,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
             </Badge>
           )}
           {/* Category label next to status */}
-          {(() => {
-            const classificationBadge = getClassificationBadge(conversation.email_classification);
-            if (!classificationBadge) return null;
-            const ClassIcon = classificationBadge.icon;
-            return (
-              <Badge variant="outline" className={cn("rounded-full text-sm px-3 py-1.5 border flex items-center gap-1.5", classificationBadge.className)}>
-                <ClassIcon className="h-3.5 w-3.5" />
-                {classificationBadge.label}
-              </Badge>
-            );
-          })()}
+          <CategoryLabel classification={conversation.email_classification} size="md" />
         </div>
 
         {/* Title */}

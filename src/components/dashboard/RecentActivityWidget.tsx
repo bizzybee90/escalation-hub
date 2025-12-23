@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
+import { CategoryLabel } from '@/components/shared/CategoryLabel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -196,31 +197,6 @@ export const RecentActivityWidget = () => {
     return 'Reply Sent';
   };
 
-  const getCategoryLabel = (category?: string) => {
-    if (!category) return null;
-    const labels: Record<string, { label: string; color: string }> = {
-      'payment_confirmation': { label: 'Payment', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-      'receipt': { label: 'Payment', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-      'marketing': { label: 'Marketing', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
-      'newsletter': { label: 'Newsletter', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-      'notification': { label: 'Notification', color: 'bg-muted text-muted-foreground' },
-      'automated_notification': { label: 'Automated', color: 'bg-muted text-muted-foreground' },
-      'recruitment': { label: 'Recruitment', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
-      'hr': { label: 'HR', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
-      'invoice': { label: 'Invoice', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-      'booking': { label: 'Booking', color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' },
-      'enquiry': { label: 'Enquiry', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' },
-      'complaint': { label: 'Complaint', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
-      'cancellation': { label: 'Cancellation', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
-      'fyi': { label: 'FYI', color: 'bg-muted text-muted-foreground' },
-    };
-    
-    const key = Object.keys(labels).find(k => 
-      category.toLowerCase().includes(k) || k.includes(category.toLowerCase())
-    );
-    
-    return key ? labels[key] : { label: category.replace(/_/g, ' '), color: 'bg-muted text-muted-foreground' };
-  };
 
   const handleActivityClick = (activity: RecentActivity) => {
     if (activity.conversation_id) {
@@ -279,14 +255,7 @@ export const RecentActivityWidget = () => {
                       <span className="text-xs font-medium text-muted-foreground">
                         {getActivityLabel(activity)}
                       </span>
-                      {activity.category && (() => {
-                        const categoryInfo = getCategoryLabel(activity.category);
-                        return categoryInfo ? (
-                          <span className={cn("text-xs px-1.5 py-0.5 rounded-full font-medium", categoryInfo.color)}>
-                            {categoryInfo.label}
-                          </span>
-                        ) : null;
-                      })()}
+                      <CategoryLabel classification={activity.category} size="xs" />
                       {activity.type === 'message' && (
                         <>
                           <span className="text-xs text-muted-foreground">•</span>
