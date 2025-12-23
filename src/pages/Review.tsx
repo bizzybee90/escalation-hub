@@ -53,6 +53,7 @@ interface ReviewConversation {
   messages: {
     body: string;
     created_at: string;
+    raw_payload?: { body?: string } | null;
   }[];
 }
 
@@ -118,7 +119,7 @@ export default function Review() {
           email_classification,
           ai_draft_response,
           customer:customers(name, email),
-          messages(body, created_at)
+          messages(body, created_at, raw_payload)
         `)
         .eq('workspace_id', userData.workspace_id)
         .eq('needs_review', true)
@@ -788,6 +789,7 @@ export default function Review() {
                     body={currentConversation.messages[0]?.body || ''}
                     summary={currentConversation.summary_for_human}
                     maxLength={600}
+                    rawHtmlBody={(currentConversation.messages[0]?.raw_payload as { body?: string })?.body}
                   />
 
                   {/* AI Draft Available */}
