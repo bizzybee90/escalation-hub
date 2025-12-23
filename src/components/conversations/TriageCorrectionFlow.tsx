@@ -1,0 +1,397 @@
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  ArrowRight, 
+  BookmarkPlus, 
+  Loader2,
+  Tag,
+  Mail,
+  Building2,
+  CheckCircle2
+} from 'lucide-react';
+import { Conversation } from '@/lib/types';
+
+// Extended classifications matching the email-triage-agent
+const CLASSIFICATIONS = [
+  { value: 'customer_inquiry', label: 'Customer Inquiry', requiresReply: true, category: 'inquiry' },
+  { value: 'booking_request', label: 'Booking Request', requiresReply: true, category: 'inquiry' },
+  { value: 'quote_request', label: 'Quote Request', requiresReply: true, category: 'inquiry' },
+  { value: 'reschedule_request', label: 'Reschedule Request', requiresReply: true, category: 'inquiry' },
+  { value: 'cancellation_request', label: 'Cancellation Request', requiresReply: true, category: 'inquiry' },
+  { value: 'complaint_dispute', label: 'Complaint/Dispute', requiresReply: true, category: 'inquiry' },
+  { value: 'supplier_invoice', label: 'Supplier Invoice', requiresReply: false, category: 'financial' },
+  { value: 'payment_confirmation', label: 'Payment Confirmation', requiresReply: false, category: 'financial' },
+  { value: 'receipt_confirmation', label: 'Receipt/Confirmation', requiresReply: false, category: 'notification' },
+  { value: 'automated_notification', label: 'Auto Notification', requiresReply: false, category: 'notification' },
+  { value: 'marketing_newsletter', label: 'Marketing/Newsletter', requiresReply: false, category: 'marketing' },
+  { value: 'spam_phishing', label: 'Spam/Phishing', requiresReply: false, category: 'spam' },
+  { value: 'recruitment_hr', label: 'Recruitment/HR', requiresReply: false, category: 'internal' },
+  { value: 'internal_system', label: 'Internal System', requiresReply: false, category: 'internal' },
+];
+
+const CATEGORY_COLORS: Record<string, string> = {
+  inquiry: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+  financial: 'bg-green-500/10 text-green-600 border-green-500/20',
+  notification: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+  marketing: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+  spam: 'bg-red-500/10 text-red-600 border-red-500/20',
+  internal: 'bg-muted text-muted-foreground border-border',
+};
+
+interface TriageCorrectionFlowProps {
+  conversation: Conversation;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onUpdate?: () => void;
+}
+
+export function TriageCorrectionFlow({ 
+  conversation, 
+  open, 
+  onOpenChange, 
+  onUpdate 
+}: TriageCorrectionFlowProps) {
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newClassification, setNewClassification] = useState(
+    conversation.email_classification || ''
+  );
+  const [createSenderRule, setCreateSenderRule] = useState(true);
+  const [senderRuleScope, setSenderRuleScope] = useState<'email' | 'domain'>('domain');
+
+  const currentClassification = conversation.email_classification || 'unknown';
+  const senderEmail = conversation.customer?.email || null;
+  const senderDomain = senderEmail?.split('@')[1] || null;
+
+  const selectedConfig = CLASSIFICATIONS.find(c => c.value === newClassification);
+  const currentConfig = CLASSIFICATIONS.find(c => c.value === currentClassification);
+
+  const handleSubmit = async () => {
+    if (!newClassification || newClassification === currentClassification) {
+      toast({ title: 'Please select a different classification' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: userData } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user?.id)
+        .single();
+
+      if (!userData?.workspace_id) throw new Error('No workspace found');
+
+      const classificationConfig = CLASSIFICATIONS.find(c => c.value === newClassification);
+      const newRequiresReply = classificationConfig?.requiresReply ?? false;
+
+      // 1. Log the correction
+      const { error: correctionError, data: correctionData } = await supabase
+        .from('triage_corrections')
+        .insert({
+          workspace_id: userData.workspace_id,
+          conversation_id: conversation.id,
+          original_classification: currentClassification,
+          new_classification: newClassification,
+          original_requires_reply: conversation.requires_reply ?? false,
+          new_requires_reply: newRequiresReply,
+          sender_email: senderEmail,
+          sender_domain: senderDomain,
+          corrected_by: user?.id,
+        })
+        .select()
+        .single();
+
+      if (correctionError) {
+        console.error('Failed to log correction:', correctionError);
+      }
+
+      // 2. Create sender rule if enabled
+      if (createSenderRule && (senderEmail || senderDomain)) {
+        const senderPattern = senderRuleScope === 'email' 
+          ? senderEmail 
+          : `*@${senderDomain}`;
+
+        // Check if rule already exists
+        const { data: existingRule } = await supabase
+          .from('sender_rules')
+          .select('id')
+          .eq('workspace_id', userData.workspace_id)
+          .eq('sender_pattern', senderPattern)
+          .maybeSingle();
+
+        if (existingRule) {
+          // Update existing rule
+          await supabase
+            .from('sender_rules')
+            .update({
+              default_classification: newClassification,
+              default_requires_reply: newRequiresReply,
+              hit_count: 0, // Reset hit count for updated rules
+              created_from_correction: correctionData?.id,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingRule.id);
+        } else {
+          // Create new rule
+          const { error: ruleError } = await supabase
+            .from('sender_rules')
+            .insert({
+              workspace_id: userData.workspace_id,
+              sender_pattern: senderPattern,
+              default_classification: newClassification,
+              default_requires_reply: newRequiresReply,
+              is_active: true,
+              created_from_correction: correctionData?.id,
+            });
+
+          if (ruleError) {
+            console.error('Failed to create sender rule:', ruleError);
+          }
+        }
+      }
+
+      // 3. Update the conversation
+      const updateData: Record<string, unknown> = {
+        email_classification: newClassification,
+        requires_reply: newRequiresReply,
+      };
+
+      if (newRequiresReply) {
+        updateData.status = 'open';
+        updateData.resolved_at = null;
+        updateData.decision_bucket = 'quick_win';
+      } else {
+        updateData.status = 'resolved';
+        updateData.resolved_at = new Date().toISOString();
+        updateData.decision_bucket = 'auto_handled';
+      }
+
+      const { error } = await supabase
+        .from('conversations')
+        .update(updateData)
+        .eq('id', conversation.id);
+
+      if (error) throw error;
+
+      toast({ 
+        title: 'Classification corrected',
+        description: createSenderRule 
+          ? `Sender rule created for ${senderRuleScope === 'email' ? senderEmail : senderDomain}`
+          : undefined
+      });
+      
+      onOpenChange(false);
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error correcting classification:', error);
+      toast({ 
+        title: 'Failed to correct classification', 
+        description: 'Please try again',
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Tag className="h-5 w-5" />
+            Correct Classification
+          </DialogTitle>
+          <DialogDescription>
+            Correct the AI's classification. Optionally create a sender rule to automatically classify future emails.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          {/* Current classification */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+              Current Classification
+            </Label>
+            <div className="flex items-center gap-2">
+              <Badge 
+                variant="outline" 
+                className={currentConfig ? CATEGORY_COLORS[currentConfig.category] : 'bg-muted'}
+              >
+                {currentConfig?.label || currentClassification}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {conversation.requires_reply ? 'Needs reply' : 'No reply needed'}
+              </span>
+            </div>
+          </div>
+
+          {/* New classification selector */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+              Correct Classification
+            </Label>
+            <Select value={newClassification} onValueChange={setNewClassification}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select classification..." />
+              </SelectTrigger>
+              <SelectContent>
+                {CLASSIFICATIONS.map((classification) => (
+                  <SelectItem 
+                    key={classification.value} 
+                    value={classification.value}
+                    disabled={classification.value === currentClassification}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant="outline" 
+                        className={`${CATEGORY_COLORS[classification.category]} text-xs px-1.5 py-0`}
+                      >
+                        {classification.category}
+                      </Badge>
+                      <span>{classification.label}</span>
+                      {classification.requiresReply && (
+                        <span className="text-xs text-muted-foreground">(needs reply)</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Change preview */}
+          {newClassification && newClassification !== currentClassification && (
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                Change Preview
+              </Label>
+              <div className="flex items-center gap-2 text-sm">
+                <Badge variant="outline" className="bg-muted">
+                  {currentConfig?.label || currentClassification}
+                </Badge>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                <Badge 
+                  variant="outline" 
+                  className={selectedConfig ? CATEGORY_COLORS[selectedConfig.category] : ''}
+                >
+                  {selectedConfig?.label}
+                </Badge>
+              </div>
+              {selectedConfig && selectedConfig.requiresReply !== (conversation.requires_reply ?? false) && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedConfig.requiresReply 
+                    ? '→ Will be moved to Action Required'
+                    : '→ Will be marked as resolved'}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Sender rule creation */}
+          {(senderEmail || senderDomain) && (
+            <div className="space-y-4 rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="create-rule" className="flex items-center gap-2">
+                    <BookmarkPlus className="h-4 w-4" />
+                    Create Sender Rule
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically classify future emails from this sender
+                  </p>
+                </div>
+                <Switch 
+                  id="create-rule" 
+                  checked={createSenderRule} 
+                  onCheckedChange={setCreateSenderRule}
+                />
+              </div>
+
+              {createSenderRule && (
+                <div className="space-y-3 pt-2 border-t">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Apply rule to
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={senderRuleScope === 'domain' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSenderRuleScope('domain')}
+                      className="justify-start"
+                      disabled={!senderDomain}
+                    >
+                      <Building2 className="h-4 w-4 mr-2" />
+                      <span className="truncate">@{senderDomain}</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={senderRuleScope === 'email' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSenderRuleScope('email')}
+                      className="justify-start"
+                      disabled={!senderEmail}
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      <span className="truncate">{senderEmail}</span>
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {senderRuleScope === 'domain' 
+                      ? `All emails from @${senderDomain} will be classified as ${selectedConfig?.label || newClassification}`
+                      : `Emails from ${senderEmail} will be classified as ${selectedConfig?.label || newClassification}`}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isSubmitting || !newClassification || newClassification === currentClassification}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Apply Correction
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

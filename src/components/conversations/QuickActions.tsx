@@ -1,12 +1,12 @@
 import { Conversation } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle2, Clock, UserPlus, UserCheck } from 'lucide-react';
+import { CheckCircle2, Clock, UserPlus, UserCheck, Tag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { SnoozeDialog } from './SnoozeDialog';
+import { TriageCorrectionFlow } from './TriageCorrectionFlow';
 
 interface QuickActionsProps {
   conversation: Conversation;
@@ -17,6 +17,7 @@ interface QuickActionsProps {
 export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsProps) => {
   const { toast } = useToast();
   const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const [correctionOpen, setCorrectionOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [assignedUserName, setAssignedUserName] = useState<string | null>(null);
 
@@ -201,6 +202,16 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
             Snooze
           </Button>
 
+          <Button 
+            onClick={() => setCorrectionOpen(true)}
+            variant="outline"
+            className="w-full justify-start smooth-transition spring-press h-11 md:h-9 rounded-[18px]"
+            size="default"
+          >
+            <Tag className="h-4 w-4 mr-2" />
+            Correct Classification
+          </Button>
+
           {conversation.assigned_to ? (
             conversation.assigned_to === currentUserId ? (
               <Button 
@@ -242,6 +253,13 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
         open={snoozeOpen}
         onOpenChange={setSnoozeOpen}
         onSuccess={onUpdate}
+      />
+
+      <TriageCorrectionFlow
+        conversation={conversation}
+        open={correctionOpen}
+        onOpenChange={setCorrectionOpen}
+        onUpdate={onUpdate}
       />
     </>
   );
