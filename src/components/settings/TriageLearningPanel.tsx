@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Brain, ArrowRight, Zap, Loader2, TrendingUp, RefreshCw, Mail, CheckCircle, RotateCcw, AlertCircle } from 'lucide-react';
+import { Brain, ArrowRight, Zap, Loader2, TrendingUp, RefreshCw, Mail, CheckCircle, RotateCcw, AlertCircle, ExternalLink } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
@@ -38,6 +39,7 @@ interface RetriagedResult {
 }
 
 export function TriageLearningPanel() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [corrections, setCorrections] = useState<CorrectionGroup[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestedRule[]>([]);
@@ -412,20 +414,41 @@ export function TriageLearningPanel() {
           </Button>
 
           {retriageResults.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <p className="text-sm font-medium">Changed Classifications:</p>
-              <div className="max-h-60 overflow-y-auto space-y-2">
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  {retriageResults.length} Classification{retriageResults.length > 1 ? 's' : ''} Changed
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRetriageResults([])}
+                  className="text-xs"
+                >
+                  Clear
+                </Button>
+              </div>
+              <div className="max-h-72 overflow-y-auto space-y-2 border rounded-lg p-2 bg-background">
                 {retriageResults.map((result) => (
                   <div
                     key={result.id}
-                    className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2 text-sm"
+                    className="flex items-center justify-between bg-muted/30 hover:bg-muted/50 rounded-lg px-3 py-2.5 text-sm transition-colors group"
                   >
-                    <span className="truncate flex-1 mr-2">{result.title}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 font-normal text-left justify-start truncate flex-1 mr-2 hover:bg-transparent hover:underline"
+                      onClick={() => navigate(`/inbox/${result.id}`)}
+                    >
+                      <span className="truncate">{result.title}</span>
+                      <ExternalLink className="h-3 w-3 ml-1.5 opacity-0 group-hover:opacity-60 shrink-0" />
+                    </Button>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge variant="outline" className={`text-xs ${getBucketColor(result.originalBucket)}`}>
                         {result.originalClassification.replace(/_/g, ' ')}
                       </Badge>
-                      <ArrowRight className="h-3 w-3" />
+                      <ArrowRight className="h-3 w-3 text-muted-foreground" />
                       <Badge variant="outline" className={`text-xs ${getBucketColor(result.newBucket)}`}>
                         {result.newClassification.replace(/_/g, ' ')}
                       </Badge>
@@ -433,6 +456,9 @@ export function TriageLearningPanel() {
                   </div>
                 ))}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Click any conversation to view it directly
+              </p>
             </div>
           )}
         </CardContent>
