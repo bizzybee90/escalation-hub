@@ -9,7 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ReviewQueueItem } from '@/components/review/ReviewQueueItem';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
-import { Checkbox } from '@/components/ui/checkbox';
+import { DraftReplyEditor } from '@/components/review/DraftReplyEditor';
+import { ReviewExplainer } from '@/components/review/ReviewExplainer';
+import { SmartBatchActions } from '@/components/review/SmartBatchActions';
+import { EmailPreview } from '@/components/review/EmailPreview';
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -22,7 +25,8 @@ import {
   Eye,
   Keyboard,
   CheckCheck,
-  X
+  X,
+  Send
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -40,6 +44,8 @@ interface ReviewConversation {
   triage_confidence: number;
   created_at: string;
   channel?: string;
+  email_classification?: string;
+  ai_draft_response?: string;
   customer: {
     name: string;
     email: string;
@@ -72,6 +78,7 @@ export default function Review() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showChangePicker, setShowChangePicker] = useState(false);
   const [showTeachMore, setShowTeachMore] = useState(false);
+  const [showDraftEditor, setShowDraftEditor] = useState(false);
   const [automationLevel, setAutomationLevel] = useState<AutomationLevel>('auto');
   const [tonePreference, setTonePreference] = useState<TonePreference>('keep_current');
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
@@ -108,6 +115,8 @@ export default function Review() {
           triage_confidence,
           created_at,
           channel,
+          email_classification,
+          ai_draft_response,
           customer:customers(name, email),
           messages(body, created_at)
         `)
@@ -602,6 +611,7 @@ export default function Review() {
             <div className="flex items-center gap-3">
               <Sparkles className="h-5 w-5 text-purple-500" />
               <h1 className="text-xl font-semibold">Teach BizzyBee</h1>
+              <ReviewExplainer />
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Keyboard className="h-3.5 w-3.5" />
@@ -703,6 +713,20 @@ export default function Review() {
               )}
             </div>
 
+            {/* Smart batch actions */}
+            {!isMultiSelectMode && (
+              <SmartBatchActions
+                reviewQueue={reviewQueue}
+                reviewedIds={reviewedIds}
+                onBatchApprove={(ids) => {
+                  batchReviewMutation.mutate({
+                    conversationIds: ids,
+                    outcome: 'confirmed',
+                  });
+                }}
+                isPending={batchReviewMutation.isPending}
+              />
+            )}
             <ScrollArea className="flex-1">
               {isLoading ? (
                 <div className="p-4 text-center text-muted-foreground animate-pulse">
@@ -760,14 +784,37 @@ export default function Review() {
                   </h3>
 
                   {/* Preview */}
-                  <div className="bg-muted/50 rounded-lg p-4 mb-4 flex-1 max-h-48 overflow-y-auto">
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {currentConversation.messages[0]?.body?.substring(0, 500) || 
-                       currentConversation.summary_for_human || 
-                       'No preview available'}
-                      {(currentConversation.messages[0]?.body?.length || 0) > 500 && '...'}
-                    </p>
-                  </div>
+                  <EmailPreview
+                    body={currentConversation.messages[0]?.body || ''}
+                    summary={currentConversation.summary_for_human}
+                    maxLength={600}
+                  />
+
+                  {/* AI Draft Available */}
+                  {currentConversation.ai_draft_response && (
+                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800 mb-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                            AI draft ready
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs gap-1.5 border-green-300 text-green-700 hover:bg-green-100"
+                          onClick={() => setShowDraftEditor(true)}
+                        >
+                          <Send className="h-3 w-3" />
+                          Edit & Send Reply
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                        {currentConversation.ai_draft_response.substring(0, 150)}...
+                      </p>
+                    </div>
+                  )}
 
                   {/* BizzyBee's decision */}
                   <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800 mb-4">
@@ -975,6 +1022,27 @@ export default function Review() {
           </div>
         </div>
       </div>
+
+      {/* Draft Reply Editor Sheet */}
+      {currentConversation && currentConversation.ai_draft_response && (
+        <DraftReplyEditor
+          open={showDraftEditor}
+          onOpenChange={setShowDraftEditor}
+          conversationId={currentConversation.id}
+          conversationTitle={currentConversation.title || 'No subject'}
+          customerEmail={currentConversation.customer?.email || ''}
+          aiDraft={currentConversation.ai_draft_response}
+          onSent={() => {
+            // Move to next unreviewed item
+            const nextUnreviewedIndex = reviewQueue.findIndex((conv, idx) => 
+              idx > currentIndex && !reviewedIds.has(conv.id)
+            );
+            if (nextUnreviewedIndex !== -1) {
+              setCurrentIndex(nextUnreviewedIndex);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
