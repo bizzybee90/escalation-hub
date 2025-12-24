@@ -12,9 +12,6 @@ import {
   CheckCircle2, 
   Clock, 
   Sparkles,
-  Brain,
-  TrendingUp,
-  BookOpen,
   Activity,
   FileEdit,
   Users
@@ -25,6 +22,7 @@ import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
 import { DraftMessages } from '@/components/dashboard/DraftMessages';
 import { HumanAIActivityLog } from '@/components/dashboard/HumanAIActivityLog';
 import { AIBriefingWidget } from '@/components/dashboard/AIBriefingWidget';
+import { LearningInsightsWidget } from '@/components/dashboard/LearningInsightsWidget';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface HomeStats {
@@ -34,12 +32,6 @@ interface HomeStats {
   reviewCount: number;
   draftCount: number;
   lastHandled: Date | null;
-}
-
-interface LearningMetrics {
-  rulesLearnedThisMonth: number;
-  accuracyRate: number;
-  totalReviewed: number;
 }
 
 export const Home = () => {
@@ -54,11 +46,6 @@ export const Home = () => {
     draftCount: 0,
     lastHandled: null,
   });
-  const [learningMetrics, setLearningMetrics] = useState<LearningMetrics>({
-    rulesLearnedThisMonth: 0,
-    accuracyRate: 0,
-    totalReviewed: 0,
-  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -68,10 +55,6 @@ export const Home = () => {
       try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
-        const monthStart = new Date();
-        monthStart.setDate(1);
-        monthStart.setHours(0, 0, 0, 0);
 
         const [
           clearedResult, 
@@ -79,9 +62,7 @@ export const Home = () => {
           atRiskResult, 
           reviewResult,
           draftResult,
-          lastHandledResult,
-          rulesResult,
-          reviewedResult
+          lastHandledResult
         ] = await Promise.all([
           // Cleared today (auto_handled + resolved)
           supabase
@@ -129,26 +110,7 @@ export const Home = () => {
             .eq('decision_bucket', 'auto_handled')
             .order('auto_handled_at', { ascending: false })
             .limit(1),
-          // Rules learned this month
-          supabase
-            .from('sender_rules')
-            .select('id', { count: 'exact', head: true })
-            .eq('workspace_id', workspace.id)
-            .gte('created_at', monthStart.toISOString()),
-          // Review accuracy
-          supabase
-            .from('conversations')
-            .select('review_outcome')
-            .eq('workspace_id', workspace.id)
-            .not('reviewed_at', 'is', null)
-            .gte('reviewed_at', monthStart.toISOString()),
         ]);
-
-        // Calculate accuracy rate
-        const reviewedConversations = reviewedResult.data || [];
-        const confirmed = reviewedConversations.filter(c => c.review_outcome === 'confirmed').length;
-        const total = reviewedConversations.length;
-        const accuracy = total > 0 ? Math.round((confirmed / total) * 100) : 0;
 
         setStats({
           clearedToday: clearedResult.count || 0,
@@ -159,12 +121,6 @@ export const Home = () => {
           lastHandled: lastHandledResult.data?.[0]?.auto_handled_at 
             ? new Date(lastHandledResult.data[0].auto_handled_at) 
             : null,
-        });
-
-        setLearningMetrics({
-          rulesLearnedThisMonth: rulesResult.count || 0,
-          accuracyRate: accuracy,
-          totalReviewed: total,
         });
       } catch (error) {
         console.error('Error fetching home stats:', error);
@@ -433,40 +389,8 @@ export const Home = () => {
 
               {/* Right Column: Learning + Activity Log */}
               <div className="space-y-4">
-                {/* Learning Metrics */}
-                {(learningMetrics.rulesLearnedThisMonth > 0 || learningMetrics.totalReviewed > 0) && (
-                  <Card className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Brain className="h-4 w-4 text-purple-500" />
-                      <h2 className="font-semibold text-foreground">Learning</h2>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="bg-muted/30 rounded-lg p-2 text-center">
-                        <div className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
-                          <BookOpen className="h-3.5 w-3.5 text-purple-500" />
-                          {learningMetrics.rulesLearnedThisMonth}
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">Rules</p>
-                      </div>
-                      {learningMetrics.totalReviewed > 0 && (
-                        <div className="bg-muted/30 rounded-lg p-2 text-center">
-                          <div className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
-                            <TrendingUp className="h-3.5 w-3.5 text-success" />
-                            {learningMetrics.accuracyRate}%
-                          </div>
-                          <p className="text-[10px] text-muted-foreground">Accuracy</p>
-                        </div>
-                      )}
-                      <div className="bg-muted/30 rounded-lg p-2 text-center">
-                        <div className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
-                          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                          {learningMetrics.totalReviewed}
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">Reviewed</p>
-                      </div>
-                    </div>
-                  </Card>
-                )}
+                {/* Enhanced Learning Insights */}
+                <LearningInsightsWidget />
 
                 {/* Human + AI Activity Log */}
                 <Card className="p-4">
