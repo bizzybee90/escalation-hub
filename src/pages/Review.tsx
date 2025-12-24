@@ -585,19 +585,23 @@ export default function Review() {
     }
   }, [currentIndex, reviewQueue.length]);
 
-  // Empty state
+  // Empty state - Celebration when training is complete
   if (!isLoading && reviewQueue.length === 0) {
     return (
       <div className="flex h-screen bg-background">
         <Sidebar />
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center max-w-md">
-            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Check className="h-8 w-8 text-green-600" />
+          <div className="text-center max-w-md px-6">
+            <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/10">
+              <Sparkles className="h-10 w-10 text-green-600" />
             </div>
-            <h2 className="text-2xl font-semibold mb-2">All caught up!</h2>
-            <p className="text-muted-foreground">
-              BizzyBee is confident about all your emails. Check back later or head to your inbox.
+            <h2 className="text-2xl font-semibold mb-3">🎉 BizzyBee is confident!</h2>
+            <p className="text-muted-foreground mb-2">
+              There are no messages that need training right now.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              BizzyBee is automatically handling routine emails based on what it has learned from you.
+              You'll only see messages here when BizzyBee wants to double-check something new.
             </p>
           </div>
         </div>
@@ -611,10 +615,13 @@ export default function Review() {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <div className="border-b px-6 py-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-3">
               <Sparkles className="h-5 w-5 text-purple-500" />
-              <h1 className="text-xl font-semibold">Teach BizzyBee</h1>
+              <div>
+                <h1 className="text-xl font-semibold">Teach BizzyBee ✨</h1>
+                <p className="text-sm text-muted-foreground">Your feedback helps BizzyBee work more independently over time</p>
+              </div>
               <ReviewExplainer />
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -622,10 +629,10 @@ export default function Review() {
               <span>↑↓ navigate • L confirm • H change • S skip</span>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 mt-3">
             <Progress value={progress} className="flex-1 h-2" />
             <span className="text-sm text-muted-foreground whitespace-nowrap">
-              {reviewedCount} of {totalCount} reviewed
+              {totalCount - reviewedCount} training examples remaining
             </span>
           </div>
         </div>
@@ -638,7 +645,7 @@ export default function Review() {
             <div className="px-3 py-2 border-b bg-muted/30 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Review Queue
+                  Training Queue
                 </span>
                 <Button
                   variant="ghost"
