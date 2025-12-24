@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Conversation } from '@/lib/types';
@@ -29,11 +29,18 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
   const subFilter = searchParams.get('filter'); // 'at-risk', 'to-reply', 'drafts'
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [selectedForCorrection, setSelectedForCorrection] = useState<Conversation | null>(null);
   const queryClient = useQueryClient();
   const PAGE_SIZE = 50;
+
+  // Debounce search to avoid spamming requests while typing
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(searchQuery), 250);
+    return () => window.clearTimeout(t);
+  }, [searchQuery]);
 
   const fetchConversations = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -89,7 +96,9 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
       query = query.or('decision_bucket.eq.auto_handled,status.eq.resolved');
     }
 
-    query = query.limit(PAGE_SIZE);
+    // When searching, fetch more items so search works beyond the first page
+    const limit = debouncedSearch && debouncedSearch.trim().length > 0 ? 250 : PAGE_SIZE;
+    query = query.limit(limit);
 
     const { data, error } = await query;
     if (error) throw error;
@@ -117,7 +126,7 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
   });
 
   const { data: conversations = [], isLoading, isFetching } = useQuery({
-    queryKey: ['jace-inbox', filter, subFilter],
+    queryKey: ['jace-inbox', filter, subFilter, debouncedSearch],
     queryFn: async () => {
       const result = await fetchConversations();
       setLastUpdated(new Date());
