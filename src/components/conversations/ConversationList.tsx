@@ -36,9 +36,19 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     return localStorage.getItem('conversation-sort') || 'newest';
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const parentRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 50;
   const queryClient = useQueryClient();
+
+  // Debounce search to avoid too many requests
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(0); // Reset to first page when searching
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Persist sort preference
   useEffect(() => {
@@ -189,6 +199,12 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       query = query.in('category', categoryFilter);
     }
 
+    // Add server-side search if search query provided
+    if (debouncedSearch && debouncedSearch.trim().length > 0) {
+      const searchTerm = debouncedSearch.trim();
+      query = query.or(`title.ilike.%${searchTerm}%,summary_for_human.ilike.%${searchTerm}%`);
+    }
+
     // Add pagination
     query = query.range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
 
@@ -240,7 +256,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   });
 
   // React Query setup with optimistic UI
-  const queryKey = ['conversations', filter, statusFilter, priorityFilter, channelFilter, categoryFilter, sortBy, page];
+  const queryKey = ['conversations', filter, statusFilter, priorityFilter, channelFilter, categoryFilter, sortBy, page, debouncedSearch];
   
   const { data: queryData, isLoading, isFetching } = useQuery({
     queryKey,
@@ -256,18 +272,8 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   const conversations = queryData?.data || [];
   const hasMore = queryData ? (page + 1) * PAGE_SIZE < (queryData.count || 0) : false;
 
-  // Filter conversations by search query
-  const filteredConversations = conversations.filter(conv => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      conv.title?.toLowerCase().includes(query) ||
-      conv.summary_for_human?.toLowerCase().includes(query) ||
-      (conv as any).customer?.name?.toLowerCase().includes(query) ||
-      (conv as any).customer?.email?.toLowerCase().includes(query) ||
-      (conv as any).customer?.phone?.toLowerCase().includes(query)
-    );
-  });
+  // Use server-side search results directly (no client-side filter needed)
+  const filteredConversations = conversations;
 
   // Notify parent of conversation changes
   useEffect(() => {
