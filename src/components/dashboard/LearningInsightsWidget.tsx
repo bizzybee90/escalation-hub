@@ -12,7 +12,9 @@ import {
   Zap,
   BookOpen,
   ArrowUpRight,
-  Clock
+  Clock,
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -23,11 +25,37 @@ interface LearningStats {
   accuracyTrend: 'up' | 'down' | 'stable';
   totalReviewed: number;
   correctionsCount: number;
+  correctionsLastWeek: number;
   automationRate: number;
   avgConfidence: number;
   topMisclassification: { from: string; to: string; count: number } | null;
   timeSavedMinutes: number;
+  trainingQueueCount: number;
+  trainingQueueLastWeek: number;
+  handlingCategories: string[];
 }
+
+// Confidence state thresholds
+type ConfidenceState = 'learning' | 'stabilising' | 'confident';
+
+const getConfidenceState = (stats: LearningStats): ConfidenceState => {
+  // Confident: Low training queue, high accuracy, many rules
+  if (stats.trainingQueueCount <= 5 && stats.accuracyRate >= 90 && stats.rulesCount >= 10) {
+    return 'confident';
+  }
+  // Stabilising: Decreasing training queue or good accuracy
+  if (stats.accuracyRate >= 75 || (stats.trainingQueueLastWeek > stats.trainingQueueCount)) {
+    return 'stabilising';
+  }
+  // Learning: Still gathering data
+  return 'learning';
+};
+
+const confidenceStateConfig: Record<ConfidenceState, { label: string; color: string; icon: typeof Brain }> = {
+  learning: { label: 'Learning', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20', icon: Brain },
+  stabilising: { label: 'Stabilising', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20', icon: Sparkles },
+  confident: { label: 'Confident', color: 'bg-green-500/10 text-green-600 border-green-500/20', icon: CheckCircle2 },
+};
 
 export const LearningInsightsWidget = () => {
   const { workspace } = useWorkspace();
@@ -47,14 +75,20 @@ export const LearningInsightsWidget = () => {
         const lastMonthStart = new Date(monthStart);
         lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
 
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+
         const [
           rulesResult,
           rulesThisMonthResult,
           reviewedThisMonthResult,
           reviewedLastMonthResult,
           correctionsResult,
+          correctionsLastWeekResult,
           conversationsResult,
-          topMisclassResult
+          topMisclassResult,
+          trainingQueueResult,
+          handledCategoriesResult
         ] = await Promise.all([
           // Total rules
           supabase
@@ -88,6 +122,12 @@ export const LearningInsightsWidget = () => {
             .select('id', { count: 'exact', head: true })
             .eq('workspace_id', workspace.id)
             .gte('corrected_at', monthStart.toISOString()),
+          // Corrections last week (for trend)
+          supabase
+            .from('triage_corrections')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace.id)
+            .gte('corrected_at', weekAgo.toISOString()),
           // Conversations for automation rate
           supabase
             .from('conversations')
@@ -100,6 +140,21 @@ export const LearningInsightsWidget = () => {
             .select('original_classification, new_classification')
             .eq('workspace_id', workspace.id)
             .gte('corrected_at', monthStart.toISOString())
+            .limit(100),
+          // Current training queue count
+          supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace.id)
+            .eq('needs_review', true)
+            .is('reviewed_at', null),
+          // Categories being handled automatically
+          supabase
+            .from('conversations')
+            .select('email_classification')
+            .eq('workspace_id', workspace.id)
+            .eq('decision_bucket', 'auto_handled')
+            .gte('created_at', weekAgo.toISOString())
             .limit(100)
         ]);
 
@@ -147,6 +202,13 @@ export const LearningInsightsWidget = () => {
         // Estimate time saved (assume 2 min per auto-handled email)
         const timeSavedMinutes = autoHandled * 2;
 
+        // Get unique categories being handled
+        const handledCategories = [...new Set(
+          (handledCategoriesResult.data || [])
+            .map(c => c.email_classification)
+            .filter(Boolean)
+        )].slice(0, 3) as string[];
+
         setStats({
           rulesCount: rulesResult.count || 0,
           rulesThisMonth: rulesThisMonthResult.count || 0,
@@ -154,6 +216,7 @@ export const LearningInsightsWidget = () => {
           accuracyTrend,
           totalReviewed: thisMonthTotal,
           correctionsCount: correctionsResult.count || 0,
+          correctionsLastWeek: correctionsLastWeekResult.count || 0,
           automationRate,
           avgConfidence,
           topMisclassification: topMisclass ? {
@@ -161,7 +224,10 @@ export const LearningInsightsWidget = () => {
             to: topMisclass[0].split('→')[1],
             count: topMisclass[1]
           } : null,
-          timeSavedMinutes
+          timeSavedMinutes,
+          trainingQueueCount: trainingQueueResult.count || 0,
+          trainingQueueLastWeek: (correctionsLastWeekResult.count || 0) + (trainingQueueResult.count || 0),
+          handlingCategories: handledCategories
         });
       } catch (error) {
         console.error('Error fetching learning stats:', error);
@@ -185,6 +251,14 @@ export const LearningInsightsWidget = () => {
     return str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
+  const confidenceState = getConfidenceState(stats);
+  const stateConfig = confidenceStateConfig[confidenceState];
+  const StateIcon = stateConfig.icon;
+
+  // Calculate training trend
+  const trainingTrendDown = stats.trainingQueueLastWeek > stats.trainingQueueCount;
+  const trainingDelta = stats.trainingQueueLastWeek - stats.trainingQueueCount;
+
   return (
     <Card 
       className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
@@ -195,7 +269,15 @@ export const LearningInsightsWidget = () => {
           <Brain className="h-4 w-4 text-purple-500" />
           <h2 className="font-semibold text-foreground">Learning</h2>
         </div>
-        <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+        <div className="flex items-center gap-2">
+          {/* Confidence State Badge */}
+          <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${stateConfig.color}`}>
+            <StateIcon className="h-3 w-3 mr-1" />
+            {stateConfig.label}
+            {stats.accuracyTrend === 'up' && <TrendingUp className="h-3 w-3 ml-1" />}
+          </Badge>
+          <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+        </div>
       </div>
 
       {/* Key metrics row */}
@@ -215,12 +297,10 @@ export const LearningInsightsWidget = () => {
 
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 text-lg font-bold text-foreground">
-            {stats.accuracyTrend === 'up' && <TrendingUp className="h-3.5 w-3.5 text-success" />}
-            {stats.accuracyTrend === 'down' && <TrendingDown className="h-3.5 w-3.5 text-destructive" />}
-            {stats.accuracyTrend === 'stable' && <Target className="h-3.5 w-3.5 text-success" />}
+            <Target className="h-3.5 w-3.5 text-success" />
             {stats.accuracyRate}%
           </div>
-          <p className="text-[10px] text-muted-foreground">Accuracy</p>
+          <p className="text-[10px] text-muted-foreground">Confidence</p>
         </div>
 
         <div className="text-center">
@@ -232,14 +312,37 @@ export const LearningInsightsWidget = () => {
         </div>
       </div>
 
-      {/* Confidence bar */}
-      <div className="mb-3">
-        <div className="flex items-center justify-between text-xs mb-1">
-          <span className="text-muted-foreground">AI Confidence</span>
-          <span className="font-medium">{stats.avgConfidence}%</span>
+      {/* Training Queue Trend */}
+      {stats.trainingQueueCount > 0 && (
+        <div className="mb-3 p-2 rounded-lg bg-muted/30">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Training queue</span>
+            <div className="flex items-center gap-1">
+              <span className="font-medium">{stats.trainingQueueCount} examples</span>
+              {trainingTrendDown && trainingDelta > 0 && (
+                <span className="text-green-600 flex items-center">
+                  <TrendingDown className="h-3 w-3" />
+                  ↓{trainingDelta}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        <Progress value={stats.avgConfidence} className="h-1.5" />
-      </div>
+      )}
+
+      {/* Now handling categories */}
+      {stats.handlingCategories.length > 0 && (
+        <div className="mb-3">
+          <p className="text-[10px] text-muted-foreground mb-1">Now handling automatically:</p>
+          <div className="flex flex-wrap gap-1">
+            {stats.handlingCategories.map(cat => (
+              <Badge key={cat} variant="secondary" className="text-[9px] px-1.5 py-0">
+                {formatClassification(cat)}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Insights row */}
       <div className="flex items-center justify-between text-xs border-t pt-3">
@@ -250,7 +353,7 @@ export const LearningInsightsWidget = () => {
         
         {stats.correctionsCount > 0 && (
           <span className="text-muted-foreground">
-            {stats.correctionsCount} correction{stats.correctionsCount !== 1 ? 's' : ''}
+            {stats.correctionsCount} teaching moment{stats.correctionsCount !== 1 ? 's' : ''}
           </span>
         )}
         

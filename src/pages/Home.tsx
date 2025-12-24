@@ -215,9 +215,9 @@ export const Home = () => {
                             {totalNeedingAttention} {totalNeedingAttention === 1 ? 'thing needs' : 'things need'} your attention
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {[
+                          {[
                               stats.atRiskCount > 0 && `${stats.atRiskCount} urgent`,
-                              stats.reviewCount > 0 && `${stats.reviewCount} to review`,
+                              stats.reviewCount > 0 && `${stats.reviewCount} training`,
                               stats.toReplyCount > 0 && `${stats.toReplyCount} to reply`
                             ].filter(Boolean).join(' • ')}
                           </p>
@@ -265,7 +265,7 @@ export const Home = () => {
                 </p>
               </Card>
 
-              {/* Review - Trust gate, secondary urgency */}
+              {/* Training - Help BizzyBee learn */}
               <Card 
                 className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
                   stats.reviewCount > 0 
@@ -281,17 +281,17 @@ export const Home = () => {
                     </div>
                     <div>
                       <p className="text-3xl font-bold text-foreground">{stats.reviewCount}</p>
-                      <p className="text-sm font-medium text-muted-foreground">Review</p>
+                      <p className="text-sm font-medium text-muted-foreground">Training</p>
                     </div>
                   </div>
                   {stats.reviewCount > 0 && (
                     <span className="text-xs font-medium text-purple-500 bg-purple-500/10 px-2 py-1 rounded-full">
-                      AI needs check
+                      Training in progress
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">
-                  {stats.reviewCount > 0 ? 'Verify AI confidence on these' : 'AI is confident on all items'}
+                  {stats.reviewCount > 0 ? 'Help BizzyBee learn faster' : 'BizzyBee is confident on all items'}
                 </p>
               </Card>
 

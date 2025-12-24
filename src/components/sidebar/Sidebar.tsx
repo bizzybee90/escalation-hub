@@ -174,7 +174,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             )}
           </Tooltip>
 
-          {/* Review - Always visible as trust gate */}
+          {/* Training - Help BizzyBee learn */}
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
@@ -187,7 +187,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                   <ClipboardCheck className="h-5 w-5 text-purple-500" />
                   {!isCollapsed && (
                     <span className="flex-1 flex items-center justify-between">
-                      <span>Review</span>
+                      <span>Training</span>
                       {viewCounts?.review ? (
                         <span className="text-xs font-semibold text-purple-500">{viewCounts.review}</span>
                       ) : null}
@@ -198,7 +198,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             </TooltipTrigger>
             {isCollapsed && (
               <TooltipContent side="right">
-                <p>Review {viewCounts?.review ? `(${viewCounts.review})` : ''}</p>
+                <p>Training {viewCounts?.review ? `(${viewCounts.review})` : ''}</p>
               </TooltipContent>
             )}
           </Tooltip>
