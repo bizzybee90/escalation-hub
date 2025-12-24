@@ -158,19 +158,21 @@ serve(async (req) => {
         const newConfidence = triageResult?.decision?.confidence;
         const newRequiresReply = triageResult?.classification?.requires_reply;
         const newWhyThisNeedsYou = triageResult?.decision?.why_this_needs_you;
+        const newTitle = triageResult?.title; // Get the new title from triage
 
-        // Check if classification changed
+        // Check if classification or title changed
         const bucketChanged = newBucket && newBucket !== conv.decision_bucket;
         const classificationChanged = newClassification && newClassification !== conv.email_classification;
+        const titleChanged = newTitle && newTitle !== conv.title;
 
-        if (bucketChanged || classificationChanged) {
+        if (bucketChanged || classificationChanged || titleChanged) {
           results.push({
             id: conv.id,
-            title: conv.title || 'Untitled',
+            title: newTitle || conv.title || 'Untitled',
             originalBucket: conv.decision_bucket || 'unknown',
-            newBucket: newBucket || 'unknown',
+            newBucket: newBucket || conv.decision_bucket || 'unknown',
             originalClassification: conv.email_classification || 'unknown',
-            newClassification: newClassification || 'unknown',
+            newClassification: newClassification || conv.email_classification || 'unknown',
             originalConfidence: conv.triage_confidence || 0,
             newConfidence: newConfidence || 0,
           });
@@ -179,8 +181,9 @@ serve(async (req) => {
             const { error: updateError } = await supabase
               .from('conversations')
               .update({
-                decision_bucket: newBucket,
-                email_classification: newClassification,
+                title: newTitle || conv.title, // Update title!
+                decision_bucket: newBucket || conv.decision_bucket,
+                email_classification: newClassification || conv.email_classification,
                 requires_reply: newRequiresReply,
                 triage_confidence: newConfidence,
                 why_this_needs_you: newWhyThisNeedsYou,
@@ -191,6 +194,8 @@ serve(async (req) => {
                 cognitive_load: triageResult?.risk?.cognitive_load || null,
                 ai_sentiment: triageResult?.sentiment?.tone || null,
                 summary_for_human: triageResult?.summary?.one_line || conv.summary_for_human,
+                lane: triageResult?.lane || null, // Also update lane
+                batch_group: triageResult?.batch_group || null, // And batch group
                 updated_at: new Date().toISOString(),
               })
               .eq('id', conv.id);
