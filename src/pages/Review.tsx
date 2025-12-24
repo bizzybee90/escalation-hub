@@ -9,10 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ReviewQueueItem } from '@/components/review/ReviewQueueItem';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
+import { CategoryLabel } from '@/components/shared/CategoryLabel';
 import { DraftReplyEditor } from '@/components/review/DraftReplyEditor';
 import { ReviewExplainer } from '@/components/review/ReviewExplainer';
 import { SmartBatchActions } from '@/components/review/SmartBatchActions';
 import { EmailPreview } from '@/components/review/EmailPreview';
+import { TriageCorrectionFlow } from '@/components/conversations/TriageCorrectionFlow';
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -80,6 +82,7 @@ export default function Review() {
   const [showChangePicker, setShowChangePicker] = useState(false);
   const [showTeachMore, setShowTeachMore] = useState(false);
   const [showDraftEditor, setShowDraftEditor] = useState(false);
+  const [showCorrectionFlow, setShowCorrectionFlow] = useState(false);
   const [automationLevel, setAutomationLevel] = useState<AutomationLevel>('auto');
   const [tonePreference, setTonePreference] = useState<TonePreference>('keep_current');
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
@@ -826,10 +829,17 @@ export default function Review() {
                         BizzyBee thinks:
                       </span>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <Badge className={bucketColors[currentConversation.decision_bucket] || 'bg-gray-500'}>
                         {bucketLabels[currentConversation.decision_bucket] || currentConversation.decision_bucket}
                       </Badge>
+                      {/* Editable classification type */}
+                      <CategoryLabel 
+                        classification={currentConversation.email_classification} 
+                        size="sm" 
+                        editable={true}
+                        onClick={() => setShowCorrectionFlow(true)}
+                      />
                       <span className="text-sm text-muted-foreground">
                         {currentConversation.why_this_needs_you || 'No explanation provided'}
                       </span>
@@ -1042,6 +1052,25 @@ export default function Review() {
             if (nextUnreviewedIndex !== -1) {
               setCurrentIndex(nextUnreviewedIndex);
             }
+          }}
+        />
+      )}
+
+      {/* Classification Correction Dialog */}
+      {currentConversation && (
+        <TriageCorrectionFlow
+          conversation={{
+            id: currentConversation.id,
+            title: currentConversation.title,
+            channel: currentConversation.channel || 'email',
+            email_classification: currentConversation.email_classification,
+            requires_reply: currentConversation.decision_bucket !== 'auto_handled' && currentConversation.decision_bucket !== 'wait',
+            customer: currentConversation.customer,
+          } as any}
+          open={showCorrectionFlow}
+          onOpenChange={setShowCorrectionFlow}
+          onUpdate={() => {
+            queryClient.invalidateQueries({ queryKey: ['review-queue'] });
           }}
         />
       )}
