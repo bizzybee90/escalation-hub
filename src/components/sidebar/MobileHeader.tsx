@@ -31,8 +31,15 @@ export const MobileHeader = ({ onMenuClick, showBackButton, onBackClick, backToT
           </div>
         )}
 
-        {/* Right side is now empty - menu is in bottom nav */}
-        <div className="w-9" />
+        {/* Right: Hamburger menu */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onMenuClick}
+          className="h-9 w-9"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
       </div>
     </header>
   );

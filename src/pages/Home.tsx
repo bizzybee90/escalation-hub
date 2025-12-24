@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
 import { Sidebar } from '@/components/sidebar/Sidebar';
+import { MobilePageLayout } from '@/components/layout/MobilePageLayout';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useNavigate } from 'react-router-dom';
@@ -416,9 +417,9 @@ export const Home = () => {
 
   if (isMobile) {
     return (
-      <div className="min-h-screen bg-background">
+      <MobilePageLayout>
         {mainContent}
-      </div>
+      </MobilePageLayout>
     );
   }
 

@@ -385,16 +385,16 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
       </div>
 
       {/* Search bar */}
-      <div className="px-6 py-4 border-b border-border/50">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 max-w-2xl">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border/50">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <div className="flex-1">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="Search or ask BizzyBee a question..."
             />
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
             <span>Updated {getTimeSinceUpdate()}</span>
             <Button
               variant="ghost"

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DataExportPanel } from '@/components/settings/DataExportPanel';
@@ -26,6 +27,8 @@ import { LearningAnalyticsDashboard } from '@/components/settings/LearningAnalyt
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { BackButton } from '@/components/shared/BackButton';
 import { SettingsSection } from '@/components/settings/SettingsSection';
+import { MobilePageLayout } from '@/components/layout/MobilePageLayout';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Bot, Plug, Shield, Layout, Code, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +42,8 @@ interface SettingsCategory {
 
 export default function Settings() {
   const [openCategory, setOpenCategory] = useState<string | null>(null);
+  const isMobile = useIsMobile();
+  const navigate = useNavigate();
 
   const settingsCategories: SettingsCategory[] = [
     {
@@ -166,7 +171,7 @@ export default function Settings() {
     setOpenCategory(openCategory === categoryId ? null : categoryId);
   };
 
-  return (
+  const content = (
     <div className="container mx-auto py-4 md:py-6 px-4 max-w-3xl">
       <div className="mb-6">
         <BackButton to="/" label="Back to Dashboard" />
@@ -229,4 +234,14 @@ export default function Settings() {
       </div>
     </div>
   );
+
+  if (isMobile) {
+    return (
+      <MobilePageLayout>
+        {content}
+      </MobilePageLayout>
+    );
+  }
+
+  return content;
 }
