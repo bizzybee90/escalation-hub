@@ -26,9 +26,10 @@ interface ActivityItem {
 
 interface ActivityFeedProps {
   onNavigate?: (path: string) => void;
+  maxItems?: number;
 }
 
-export function ActivityFeed({ onNavigate }: ActivityFeedProps) {
+export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
   const { workspace } = useWorkspace();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,9 +138,9 @@ export function ActivityFeed({ onNavigate }: ActivityFeedProps) {
           });
         });
 
-        // Sort by timestamp and take top 10
+        // Sort by timestamp and take top items
         allActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-        setActivities(allActivities.slice(0, 10));
+        setActivities(allActivities.slice(0, maxItems));
       } catch (error) {
         console.error('Error fetching activities:', error);
       } finally {
@@ -167,7 +168,7 @@ export function ActivityFeed({ onNavigate }: ActivityFeedProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [workspace?.id]);
+  }, [workspace?.id, maxItems]);
 
   const getActivityIcon = (type: ActivityItem['type']) => {
     switch (type) {

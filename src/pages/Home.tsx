@@ -395,7 +395,7 @@ export const Home = () => {
                   <Activity className="h-4 w-4 text-primary" />
                   <h2 className="font-semibold text-foreground">Recent Activity</h2>
                 </div>
-                <ActivityFeed onNavigate={handleNavigate} />
+                <ActivityFeed onNavigate={handleNavigate} maxItems={6} />
                 <Button
                   variant="ghost"
                   size="sm"
