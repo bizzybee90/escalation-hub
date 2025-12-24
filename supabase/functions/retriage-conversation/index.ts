@@ -80,18 +80,31 @@ serve(async (req) => {
     const message = messages[0];
     const rawPayload = message.raw_payload as Record<string, any> | null;
 
-    // Extract email details
-    const fromEmail = rawPayload?.from_email 
-      || rawPayload?.from 
-      || (conversation.customer as any)?.email 
-      || 'unknown@unknown.com';
+    // Helper to safely extract email string from various formats
+    const extractEmailString = (emailValue: unknown): string => {
+      if (typeof emailValue === 'string') {
+        return emailValue;
+      }
+      if (emailValue && typeof emailValue === 'object') {
+        const obj = emailValue as Record<string, unknown>;
+        return String(obj.email || obj.address || obj.value || 'unknown@unknown.com');
+      }
+      return 'unknown@unknown.com';
+    };
+
+    // Extract email details - handle both string and object formats
+    const fromEmail = extractEmailString(
+      rawPayload?.from_email 
+        || rawPayload?.from 
+        || (conversation.customer as any)?.email
+    );
     const fromName = message.actor_name 
       || rawPayload?.from_name 
       || (conversation.customer as any)?.name 
       || 'Unknown';
     const subject = conversation.title || rawPayload?.subject || 'No Subject';
     const body = message.body || '';
-    const toEmail = rawPayload?.to_email || rawPayload?.to || '';
+    const toEmail = extractEmailString(rawPayload?.to_email || rawPayload?.to);
 
     console.log(`[retriage-conversation] Triaging email from ${fromName} <${fromEmail}>, subject: ${subject}`);
 

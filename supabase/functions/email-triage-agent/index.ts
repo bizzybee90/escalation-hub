@@ -574,11 +574,27 @@ serve(async (req) => {
   const startTime = Date.now();
   const MAX_RETRIES = 1;
 
+  // Helper to safely extract email string from various formats
+  const extractEmailString = (emailValue: unknown): string => {
+    if (typeof emailValue === 'string') {
+      return emailValue;
+    }
+    if (emailValue && typeof emailValue === 'object') {
+      // Handle object formats like { email: "...", name: "..." } or { address: "..." }
+      const obj = emailValue as Record<string, unknown>;
+      return String(obj.email || obj.address || obj.value || 'unknown@unknown.com');
+    }
+    return 'unknown@unknown.com';
+  };
+
   try {
     const request: TriageRequest = await req.json();
     const { email, workspace_id, business_context, sender_rule, sender_behaviour, pre_triage_hints } = request;
 
-    console.log('Decision router processing email from:', email.from_email, 'subject:', email.subject);
+    // Normalize the from_email to always be a string
+    const fromEmailString = extractEmailString(email.from_email);
+
+    console.log('Decision router processing email from:', fromEmailString, 'subject:', email.subject);
 
     // Fetch business context from database if not provided
     let enrichedBusinessContext: any = business_context || {};
@@ -681,7 +697,7 @@ INVOICE CLASSIFICATION RULES (IMPORTANT):
       contextualPrompt += '\n\nCONTEXT: There is an active payment dispute. Payment processor emails = ACT_NOW with financial risk.';
     }
     if (enrichedBusinessContext.vip_domains && enrichedBusinessContext.vip_domains.length > 0) {
-      const senderDomain = email.from_email.split('@')[1]?.toLowerCase();
+      const senderDomain = fromEmailString.split('@')[1]?.toLowerCase();
       if (enrichedBusinessContext.vip_domains.includes(senderDomain)) {
         contextualPrompt += '\n\nCONTEXT: This sender is from a VIP customer domain. Treat as ACT_NOW with retention risk.';
       }
@@ -921,7 +937,7 @@ ${email.body.substring(0, 5000)}
     }
 
     // Determine if this needs review (for reconciliation flow)
-    const senderDomain = request.email.from_email.split('@')[1]?.toLowerCase();
+    const senderDomain = fromEmailString.split('@')[1]?.toLowerCase();
     const needsReview = 
       // Low-medium confidence (< 85%)
       (routeResult.decision.confidence < 0.85 && routeResult.decision.bucket !== 'auto_handled') ||
