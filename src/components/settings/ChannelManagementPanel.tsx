@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { MessageSquare, Phone, Mail, Globe, Plus, Cloud, Info, CheckCircle } from 'lucide-react';
+import { MessageSquare, Phone, Mail, Globe, Plus, Cloud, Info, CheckCircle, Zap, FileEdit, Eye, Pause, Settings2 } from 'lucide-react';
 import { EmailAccountCard } from './EmailAccountCard';
 import {
   Select,
@@ -26,6 +26,7 @@ interface Channel {
   id: string;
   channel: string;
   enabled: boolean;
+  automation_level: string;
 }
 
 interface EmailConfig {
@@ -137,7 +138,7 @@ export const ChannelManagementPanel = () => {
     try {
       const { data, error } = await supabase
         .from('workspace_channels')
-        .select('*')
+        .select('id, channel, enabled, automation_level')
         .eq('workspace_id', workspace.id)
         .order('channel');
 
@@ -243,6 +244,36 @@ export const ChannelManagementPanel = () => {
     }
   };
 
+  const updateChannelAutomation = async (channelId: string, automationLevel: string) => {
+    try {
+      const { error } = await supabase
+        .from('workspace_channels')
+        .update({ automation_level: automationLevel })
+        .eq('id', channelId);
+
+      if (error) throw error;
+
+      setChannels(channels.map(c => 
+        c.id === channelId ? { ...c, automation_level: automationLevel } : c
+      ));
+
+      toast({
+        title: 'Automation mode updated',
+        description: `Channel automation set to ${automationModes.find(m => m.value === automationLevel)?.label || automationLevel}`
+      });
+    } catch (error) {
+      console.error('Error updating channel automation:', error);
+      toast({ title: 'Error', description: 'Failed to update automation mode', variant: 'destructive' });
+    }
+  };
+
+  const automationModes = [
+    { value: 'automatic', label: 'Automatic', icon: Zap, description: 'AI drafts and sends automatically', color: 'text-success' },
+    { value: 'draft_only', label: 'Draft Only', icon: FileEdit, description: 'AI drafts, you send', color: 'text-amber-500' },
+    { value: 'review_required', label: 'Review Mode', icon: Eye, description: 'Everything goes to review', color: 'text-purple-500' },
+    { value: 'disabled', label: 'Manual', icon: Pause, description: 'No AI assistance', color: 'text-muted-foreground' },
+  ];
+
   if (loading) {
     return <div className="p-6">Loading channels...</div>;
   }
@@ -340,39 +371,82 @@ export const ChannelManagementPanel = () => {
       {/* Other Channels Section */}
       <div className="space-y-4">
         <div>
-          <h3 className="text-lg font-semibold">Other Channels</h3>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Settings2 className="h-5 w-5" />
+            Other Channels
+          </h3>
           <p className="text-sm text-muted-foreground">
-            Enable or disable communication channels for your workspace
+            Enable channels and configure AI automation levels for each
           </p>
         </div>
 
         <div className="space-y-3">
           {channels.filter(c => c.channel !== 'email').map((channel) => {
             const Icon = channelIcons[channel.channel];
+            const currentMode = automationModes.find(m => m.value === (channel.automation_level || 'draft_only'));
+            const ModeIcon = currentMode?.icon || FileEdit;
+            
             return (
               <Card key={channel.id} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${channel.enabled ? 'bg-primary/10 text-primary' : 'bg-muted'}`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{channelLabels[channel.channel]}</span>
-                        {channel.enabled && <Badge variant="secondary" className="text-xs">Active</Badge>}
+                <div className="space-y-3">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${channel.enabled ? 'bg-primary/10 text-primary' : 'bg-muted'}`}>
+                        <Icon className="h-5 w-5" />
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {channel.channel === 'sms' && 'Text message communication'}
-                        {channel.channel === 'whatsapp' && 'WhatsApp Business messaging'}
-                        {channel.channel === 'webchat' && 'Website chat widget (coming soon)'}
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{channelLabels[channel.channel]}</span>
+                          {channel.enabled && <Badge variant="secondary" className="text-xs">Active</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {channel.channel === 'sms' && 'Text message communication'}
+                          {channel.channel === 'whatsapp' && 'WhatsApp Business messaging'}
+                          {channel.channel === 'webchat' && 'Website chat widget (coming soon)'}
+                        </p>
+                      </div>
                     </div>
+                    <Switch
+                      checked={channel.enabled}
+                      onCheckedChange={() => toggleChannel(channel.id, channel.enabled)}
+                      disabled={channel.channel === 'webchat'}
+                    />
                   </div>
-                  <Switch
-                    checked={channel.enabled}
-                    onCheckedChange={() => toggleChannel(channel.id, channel.enabled)}
-                    disabled={channel.channel === 'webchat'}
-                  />
+
+                  {/* Automation level selector */}
+                  {channel.enabled && channel.channel !== 'webchat' && (
+                    <div className="pl-11 pt-2 border-t">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ModeIcon className={`h-3.5 w-3.5 ${currentMode?.color}`} />
+                        <span className="text-xs font-medium">AI Automation Mode</span>
+                      </div>
+                      <Select 
+                        value={channel.automation_level || 'draft_only'} 
+                        onValueChange={(value) => updateChannelAutomation(channel.id, value)}
+                      >
+                        <SelectTrigger className="w-full h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {automationModes.map((mode) => {
+                            const MIcon = mode.icon;
+                            return (
+                              <SelectItem key={mode.value} value={mode.value}>
+                                <div className="flex items-center gap-2">
+                                  <MIcon className={`h-3.5 w-3.5 ${mode.color}`} />
+                                  <div>
+                                    <span className="font-medium">{mode.label}</span>
+                                    <span className="text-muted-foreground ml-1">- {mode.description}</span>
+                                  </div>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               </Card>
             );

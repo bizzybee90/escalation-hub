@@ -1,0 +1,265 @@
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/hooks/useWorkspace';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { 
+  Brain, 
+  TrendingUp, 
+  TrendingDown,
+  Target,
+  Zap,
+  BookOpen,
+  ArrowUpRight,
+  Clock
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+interface LearningStats {
+  rulesCount: number;
+  rulesThisMonth: number;
+  accuracyRate: number;
+  accuracyTrend: 'up' | 'down' | 'stable';
+  totalReviewed: number;
+  correctionsCount: number;
+  automationRate: number;
+  avgConfidence: number;
+  topMisclassification: { from: string; to: string; count: number } | null;
+  timeSavedMinutes: number;
+}
+
+export const LearningInsightsWidget = () => {
+  const { workspace } = useWorkspace();
+  const navigate = useNavigate();
+  const [stats, setStats] = useState<LearningStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLearningStats = async () => {
+      if (!workspace?.id) return;
+
+      try {
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+
+        const lastMonthStart = new Date(monthStart);
+        lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+
+        const [
+          rulesResult,
+          rulesThisMonthResult,
+          reviewedThisMonthResult,
+          reviewedLastMonthResult,
+          correctionsResult,
+          conversationsResult,
+          topMisclassResult
+        ] = await Promise.all([
+          // Total rules
+          supabase
+            .from('sender_rules')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace.id),
+          // Rules this month
+          supabase
+            .from('sender_rules')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace.id)
+            .gte('created_at', monthStart.toISOString()),
+          // Reviewed this month
+          supabase
+            .from('conversations')
+            .select('review_outcome')
+            .eq('workspace_id', workspace.id)
+            .not('reviewed_at', 'is', null)
+            .gte('reviewed_at', monthStart.toISOString()),
+          // Reviewed last month
+          supabase
+            .from('conversations')
+            .select('review_outcome')
+            .eq('workspace_id', workspace.id)
+            .not('reviewed_at', 'is', null)
+            .gte('reviewed_at', lastMonthStart.toISOString())
+            .lt('reviewed_at', monthStart.toISOString()),
+          // Corrections this month
+          supabase
+            .from('triage_corrections')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace.id)
+            .gte('corrected_at', monthStart.toISOString()),
+          // Conversations for automation rate
+          supabase
+            .from('conversations')
+            .select('decision_bucket, triage_confidence')
+            .eq('workspace_id', workspace.id)
+            .gte('created_at', monthStart.toISOString()),
+          // Top misclassification
+          supabase
+            .from('triage_corrections')
+            .select('original_classification, new_classification')
+            .eq('workspace_id', workspace.id)
+            .gte('corrected_at', monthStart.toISOString())
+            .limit(100)
+        ]);
+
+        // Calculate this month accuracy
+        const thisMonthReviews = reviewedThisMonthResult.data || [];
+        const thisMonthConfirmed = thisMonthReviews.filter(c => c.review_outcome === 'confirmed').length;
+        const thisMonthTotal = thisMonthReviews.length;
+        const thisMonthAccuracy = thisMonthTotal > 0 ? Math.round((thisMonthConfirmed / thisMonthTotal) * 100) : 100;
+
+        // Calculate last month accuracy for trend
+        const lastMonthReviews = reviewedLastMonthResult.data || [];
+        const lastMonthConfirmed = lastMonthReviews.filter(c => c.review_outcome === 'confirmed').length;
+        const lastMonthTotal = lastMonthReviews.length;
+        const lastMonthAccuracy = lastMonthTotal > 0 ? Math.round((lastMonthConfirmed / lastMonthTotal) * 100) : 100;
+
+        // Determine trend
+        let accuracyTrend: 'up' | 'down' | 'stable' = 'stable';
+        if (thisMonthAccuracy > lastMonthAccuracy + 5) accuracyTrend = 'up';
+        else if (thisMonthAccuracy < lastMonthAccuracy - 5) accuracyTrend = 'down';
+
+        // Calculate automation rate
+        const conversations = conversationsResult.data || [];
+        const autoHandled = conversations.filter(c => c.decision_bucket === 'auto_handled').length;
+        const automationRate = conversations.length > 0 ? Math.round((autoHandled / conversations.length) * 100) : 0;
+
+        // Calculate avg confidence
+        const confidenceValues = conversations
+          .filter(c => c.triage_confidence != null)
+          .map(c => c.triage_confidence as number);
+        const avgConfidence = confidenceValues.length > 0
+          ? Math.round(confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length)
+          : 0;
+
+        // Find top misclassification
+        const corrections = topMisclassResult.data || [];
+        const misclassMap: Record<string, number> = {};
+        corrections.forEach(c => {
+          if (c.original_classification && c.new_classification) {
+            const key = `${c.original_classification}→${c.new_classification}`;
+            misclassMap[key] = (misclassMap[key] || 0) + 1;
+          }
+        });
+        const topMisclass = Object.entries(misclassMap).sort((a, b) => b[1] - a[1])[0];
+
+        // Estimate time saved (assume 2 min per auto-handled email)
+        const timeSavedMinutes = autoHandled * 2;
+
+        setStats({
+          rulesCount: rulesResult.count || 0,
+          rulesThisMonth: rulesThisMonthResult.count || 0,
+          accuracyRate: thisMonthAccuracy,
+          accuracyTrend,
+          totalReviewed: thisMonthTotal,
+          correctionsCount: correctionsResult.count || 0,
+          automationRate,
+          avgConfidence,
+          topMisclassification: topMisclass ? {
+            from: topMisclass[0].split('→')[0],
+            to: topMisclass[0].split('→')[1],
+            count: topMisclass[1]
+          } : null,
+          timeSavedMinutes
+        });
+      } catch (error) {
+        console.error('Error fetching learning stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLearningStats();
+  }, [workspace?.id]);
+
+  if (loading || !stats) {
+    return (
+      <Card className="p-4 animate-pulse">
+        <div className="h-32 bg-muted/30 rounded-lg" />
+      </Card>
+    );
+  }
+
+  const formatClassification = (str: string) => {
+    return str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  return (
+    <Card 
+      className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+      onClick={() => navigate('/settings?tab=learning')}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Brain className="h-4 w-4 text-purple-500" />
+          <h2 className="font-semibold text-foreground">Learning</h2>
+        </div>
+        <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+      </div>
+
+      {/* Key metrics row */}
+      <div className="grid grid-cols-3 gap-3 mb-3">
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1 text-lg font-bold text-foreground">
+            <BookOpen className="h-3.5 w-3.5 text-purple-500" />
+            {stats.rulesCount}
+          </div>
+          <p className="text-[10px] text-muted-foreground">Rules</p>
+          {stats.rulesThisMonth > 0 && (
+            <Badge variant="secondary" className="text-[9px] px-1 py-0 mt-0.5">
+              +{stats.rulesThisMonth} this month
+            </Badge>
+          )}
+        </div>
+
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1 text-lg font-bold text-foreground">
+            {stats.accuracyTrend === 'up' && <TrendingUp className="h-3.5 w-3.5 text-success" />}
+            {stats.accuracyTrend === 'down' && <TrendingDown className="h-3.5 w-3.5 text-destructive" />}
+            {stats.accuracyTrend === 'stable' && <Target className="h-3.5 w-3.5 text-success" />}
+            {stats.accuracyRate}%
+          </div>
+          <p className="text-[10px] text-muted-foreground">Accuracy</p>
+        </div>
+
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1 text-lg font-bold text-foreground">
+            <Zap className="h-3.5 w-3.5 text-amber-500" />
+            {stats.automationRate}%
+          </div>
+          <p className="text-[10px] text-muted-foreground">Automated</p>
+        </div>
+      </div>
+
+      {/* Confidence bar */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between text-xs mb-1">
+          <span className="text-muted-foreground">AI Confidence</span>
+          <span className="font-medium">{stats.avgConfidence}%</span>
+        </div>
+        <Progress value={stats.avgConfidence} className="h-1.5" />
+      </div>
+
+      {/* Insights row */}
+      <div className="flex items-center justify-between text-xs border-t pt-3">
+        <div className="flex items-center gap-1 text-muted-foreground">
+          <Clock className="h-3 w-3" />
+          <span>~{Math.round(stats.timeSavedMinutes / 60)}h saved</span>
+        </div>
+        
+        {stats.correctionsCount > 0 && (
+          <span className="text-muted-foreground">
+            {stats.correctionsCount} correction{stats.correctionsCount !== 1 ? 's' : ''}
+          </span>
+        )}
+        
+        {stats.topMisclassification && (
+          <span className="text-muted-foreground truncate max-w-[120px]" title={`${formatClassification(stats.topMisclassification.from)} → ${formatClassification(stats.topMisclassification.to)}`}>
+            Top fix: {formatClassification(stats.topMisclassification.from).substring(0, 8)}...
+          </span>
+        )}
+      </div>
+    </Card>
+  );
+};
