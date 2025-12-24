@@ -169,10 +169,6 @@ const RouterContent = () => {
         } 
       />
       <Route 
-        path="/completed" 
-        element={<Navigate to="/done" replace />}
-      />
-      <Route 
         path="/awaiting-reply" 
         element={
           <AuthGuard>
