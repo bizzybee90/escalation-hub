@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
 import { Sidebar } from '@/components/sidebar/Sidebar';
+import { MobilePageLayout } from '@/components/layout/MobilePageLayout';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -320,9 +321,9 @@ export const ActivityPage = () => {
 
   if (isMobile) {
     return (
-      <div className="min-h-screen bg-background">
+      <MobilePageLayout>
         {mainContent}
-      </div>
+      </MobilePageLayout>
     );
   }
 
