@@ -658,7 +658,7 @@ export type Database = {
       }
       email_provider_configs: {
         Row: {
-          access_token: string
+          access_token: string | null
           access_token_encrypted: string | null
           account_id: string
           aliases: string[] | null
@@ -675,7 +675,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
-          access_token: string
+          access_token?: string | null
           access_token_encrypted?: string | null
           account_id: string
           aliases?: string[] | null
@@ -692,7 +692,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
-          access_token?: string
+          access_token?: string | null
           access_token_encrypted?: string | null
           account_id?: string
           aliases?: string[] | null
@@ -900,7 +900,7 @@ export type Database = {
       }
       gmail_channel_configs: {
         Row: {
-          access_token: string
+          access_token: string | null
           access_token_encrypted: string | null
           connected_at: string | null
           created_at: string | null
@@ -910,7 +910,7 @@ export type Database = {
           id: string
           import_mode: string | null
           last_sync_at: string | null
-          refresh_token: string
+          refresh_token: string | null
           refresh_token_encrypted: string | null
           token_expires_at: string | null
           updated_at: string | null
@@ -918,7 +918,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
-          access_token: string
+          access_token?: string | null
           access_token_encrypted?: string | null
           connected_at?: string | null
           created_at?: string | null
@@ -928,7 +928,7 @@ export type Database = {
           id?: string
           import_mode?: string | null
           last_sync_at?: string | null
-          refresh_token: string
+          refresh_token?: string | null
           refresh_token_encrypted?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
@@ -936,7 +936,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
-          access_token?: string
+          access_token?: string | null
           access_token_encrypted?: string | null
           connected_at?: string | null
           created_at?: string | null
@@ -946,7 +946,7 @@ export type Database = {
           id?: string
           import_mode?: string | null
           last_sync_at?: string | null
-          refresh_token?: string
+          refresh_token?: string | null
           refresh_token_encrypted?: string | null
           token_expires_at?: string | null
           updated_at?: string | null

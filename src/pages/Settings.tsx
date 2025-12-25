@@ -8,6 +8,7 @@ import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
 import { RetentionPolicyPanel } from '@/components/settings/RetentionPolicyPanel';
 import { TestDataCleanupPanel } from '@/components/settings/TestDataCleanupPanel';
 import { GDPRDashboard } from '@/components/settings/GDPRDashboard';
+import { WorkspaceGDPRSettingsPanel } from '@/components/settings/WorkspaceGDPRSettingsPanel';
 import { CustomerMergePanel } from '@/components/settings/CustomerMergePanel';
 import { ChannelManagementPanel } from '@/components/settings/ChannelManagementPanel';
 import { AIAgentPanel } from '@/components/settings/AIAgentPanel';
@@ -114,6 +115,9 @@ export default function Settings() {
         <div className="space-y-3">
           <SettingsSection title="GDPR Dashboard" description="Compliance overview" defaultOpen>
             <GDPRDashboard />
+          </SettingsSection>
+          <SettingsSection title="GDPR Settings" description="DPA and privacy configuration">
+            <WorkspaceGDPRSettingsPanel />
           </SettingsSection>
           <SettingsSection title="Data Export" description="Export customer data">
             <DataExportPanel />

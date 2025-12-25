@@ -92,6 +92,87 @@ function isCSATResponse(message: string): number | null {
   return null;
 }
 
+// GDPR keyword detection patterns
+interface GDPRKeywordResult {
+  detected: boolean;
+  type: 'forget' | 'delete' | 'unsubscribe' | 'export' | 'consent_withdraw' | null;
+  keyword: string | null;
+}
+
+function detectGDPRKeywords(message: string): GDPRKeywordResult {
+  const lowerMessage = message.toLowerCase().trim();
+  
+  // Forget me / Right to be forgotten patterns
+  const forgetPatterns = [
+    /\bforget\s*me\b/,
+    /\bright\s*to\s*be\s*forgotten\b/,
+    /\berase\s*my\s*data\b/,
+    /\bremove\s*my\s*information\b/,
+    /\bforget\s*my\s*data\b/,
+  ];
+  
+  // Delete patterns
+  const deletePatterns = [
+    /\bdelete\s*(my|all)?\s*(data|information|account|records)\b/,
+    /\bremove\s*my\s*account\b/,
+    /\bgdpr\s*deletion\b/,
+    /\bdata\s*deletion\b/,
+  ];
+  
+  // Unsubscribe patterns
+  const unsubscribePatterns = [
+    /\bunsubscribe\b/,
+    /\bstop\s*(messaging|texting|emailing|contacting)\s*me\b/,
+    /\bopt\s*out\b/,
+    /\bremove\s*(me\s*)?from\s*(mailing\s*)?list\b/,
+    /\bno\s*more\s*(emails?|messages?|texts?)\b/,
+  ];
+  
+  // Export patterns  
+  const exportPatterns = [
+    /\bexport\s*(my)?\s*data\b/,
+    /\bdownload\s*(my)?\s*data\b/,
+    /\bdata\s*portability\b/,
+    /\bgive\s*me\s*(my)?\s*data\b/,
+    /\bsend\s*me\s*(my)?\s*data\b/,
+  ];
+  
+  // Consent withdrawal patterns
+  const consentPatterns = [
+    /\bwithdraw\s*(my)?\s*consent\b/,
+    /\brevoke\s*(my)?\s*consent\b/,
+    /\bi\s*don'?t\s*consent\b/,
+    /\bremove\s*(my)?\s*consent\b/,
+  ];
+  
+  for (const pattern of forgetPatterns) {
+    const match = lowerMessage.match(pattern);
+    if (match) return { detected: true, type: 'forget', keyword: match[0] };
+  }
+  
+  for (const pattern of deletePatterns) {
+    const match = lowerMessage.match(pattern);
+    if (match) return { detected: true, type: 'delete', keyword: match[0] };
+  }
+  
+  for (const pattern of unsubscribePatterns) {
+    const match = lowerMessage.match(pattern);
+    if (match) return { detected: true, type: 'unsubscribe', keyword: match[0] };
+  }
+  
+  for (const pattern of exportPatterns) {
+    const match = lowerMessage.match(pattern);
+    if (match) return { detected: true, type: 'export', keyword: match[0] };
+  }
+  
+  for (const pattern of consentPatterns) {
+    const match = lowerMessage.match(pattern);
+    if (match) return { detected: true, type: 'consent_withdraw', keyword: match[0] };
+  }
+  
+  return { detected: false, type: null, keyword: null };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -224,6 +305,101 @@ serve(async (req) => {
         });
       } else {
         console.log('⚠️ [receive-message] CSAT response received but no matching conversation found, processing as regular message');
+      }
+    }
+
+    // Step 2.5: Check for GDPR keywords (FORGET, DELETE, UNSUBSCRIBE, etc.)
+    const gdprResult = detectGDPRKeywords(normalised.message_content);
+    
+    if (gdprResult.detected) {
+      console.log(`🔒 [receive-message] GDPR keyword detected: ${gdprResult.type} - "${gdprResult.keyword}"`);
+      
+      // Find customer first
+      const { data: gdprCustomer } = await supabase
+        .from('customers')
+        .select('id, workspace_id, name, email')
+        .or(`phone.eq.${normalised.customer_identifier},email.eq.${normalised.customer_identifier}`)
+        .maybeSingle();
+      
+      if (gdprCustomer) {
+        // Log the GDPR request
+        await supabase.from('data_access_logs').insert({
+          action: `gdpr_keyword_${gdprResult.type}`,
+          customer_id: gdprCustomer.id,
+          metadata: {
+            keyword: gdprResult.keyword,
+            type: gdprResult.type,
+            channel: normalised.channel,
+            original_message: normalised.message_content.substring(0, 200),
+          },
+        });
+        
+        // Handle based on type
+        let responseMessage = '';
+        
+        switch (gdprResult.type) {
+          case 'forget':
+          case 'delete':
+            // Create deletion request
+            await supabase.from('data_deletion_requests').insert({
+              customer_id: gdprCustomer.id,
+              reason: `Auto-detected from message: "${gdprResult.keyword}"`,
+              deletion_type: 'full',
+              status: 'pending',
+            });
+            responseMessage = "We've received your data deletion request. We'll process this within 30 days as required by GDPR. You'll receive a confirmation once complete.";
+            break;
+            
+          case 'unsubscribe':
+          case 'consent_withdraw':
+            // Withdraw consent for this channel
+            await supabase.functions.invoke('withdraw-consent', {
+              body: {
+                customer_id: gdprCustomer.id,
+                channel: normalised.channel,
+                reason: `Auto-detected from message: "${gdprResult.keyword}"`,
+              }
+            });
+            responseMessage = "You've been unsubscribed from this channel. We won't contact you here anymore unless you reach out first.";
+            break;
+            
+          case 'export':
+            // Trigger data export
+            await supabase.functions.invoke('export-customer-data', {
+              body: { customer_identifier: gdprCustomer.id }
+            });
+            if (gdprCustomer.email) {
+              responseMessage = `We're preparing your data export. It will be sent to ${gdprCustomer.email} within 24 hours.`;
+            } else {
+              responseMessage = "We're preparing your data export. Please provide an email address where we can send it.";
+            }
+            break;
+        }
+        
+        // Send automatic response
+        if (responseMessage) {
+          await supabase.functions.invoke('send-response', {
+            body: {
+              channel: normalised.channel,
+              to: normalised.customer_identifier,
+              message: responseMessage,
+            }
+          });
+        }
+        
+        console.log(`✅ [receive-message] GDPR request processed: ${gdprResult.type}`);
+        
+        return new Response(JSON.stringify({
+          success: true,
+          type: 'gdpr_request',
+          gdpr_type: gdprResult.type,
+          customer_id: gdprCustomer.id,
+          response_sent: !!responseMessage,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } else {
+        console.log('⚠️ [receive-message] GDPR keyword detected but customer not found, processing as regular message');
       }
     }
 
