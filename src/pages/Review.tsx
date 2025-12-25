@@ -99,6 +99,7 @@ export default function Review() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { celebrateConfirmation, celebratePatternLearned, celebrateQueueComplete } = useReviewFeedback();
@@ -652,6 +653,162 @@ export default function Review() {
 
   // Mobile layout
   if (isMobile) {
+    const conv = currentConversation;
+    const emailBody = conv?.messages?.[0]?.raw_payload?.body || conv?.messages?.[0]?.body || '';
+    
+    // Mobile Detail View
+    if (mobileShowDetail && conv) {
+      return (
+        <div className="flex flex-col h-screen bg-background overflow-hidden">
+          <MobileHeader 
+            onMenuClick={() => setSidebarOpen(true)}
+            showBackButton
+            onBackClick={() => setMobileShowDetail(false)}
+            backToText="Back"
+          />
+          <MobileSidebarSheet
+            open={sidebarOpen}
+            onOpenChange={setSidebarOpen}
+            onNavigate={() => setSidebarOpen(false)}
+          />
+          
+          {/* Detail content */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4 space-y-4">
+              {/* Header */}
+              <div>
+                <h2 className="font-semibold text-base break-words">
+                  {conv.customer?.name || conv.customer?.email || 'Unknown Sender'}
+                </h2>
+                <p className="text-xs text-muted-foreground">{conv.customer?.email || 'No email'}</p>
+              </div>
+              
+              {/* Title */}
+              <div>
+                <h3 className="font-medium text-sm break-words">{conv.title}</h3>
+              </div>
+              
+              {/* Email content preview */}
+              <Card className="p-3">
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words line-clamp-6">
+                  {emailBody}
+                </p>
+                {emailBody.length > 300 && (
+                  <Button variant="link" size="sm" className="p-0 h-auto mt-2 text-xs">
+                    View full message
+                  </Button>
+                )}
+              </Card>
+              
+              {/* AI Draft section */}
+              {conv.ai_draft_response && (
+                <Card className="p-3 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-700 dark:text-green-400">AI draft ready</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground break-words line-clamp-3">
+                    {conv.ai_draft_response}
+                  </p>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="mt-2 w-full"
+                    onClick={() => setShowDraftEditor(true)}
+                  >
+                    <FileEdit className="h-3.5 w-3.5 mr-1.5" />
+                    Edit & Send Reply
+                  </Button>
+                </Card>
+              )}
+              
+              {/* BizzyBee thinks */}
+              <Card className="p-3 bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-4 w-4 text-purple-600" />
+                  <span className="text-sm font-medium text-purple-700 dark:text-purple-400">BizzyBee thinks:</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  <Badge className={cn("text-xs", bucketColors[conv.decision_bucket || 'wait'])}>
+                    {bucketLabels[conv.decision_bucket || 'wait']}
+                  </Badge>
+                  {conv.email_classification && (
+                    <Badge variant="outline" className="text-xs">
+                      {conv.email_classification.replace(/_/g, ' ')}
+                    </Badge>
+                  )}
+                </div>
+                {conv.why_this_needs_you && (
+                  <p className="text-xs text-muted-foreground break-words">
+                    {conv.why_this_needs_you}
+                  </p>
+                )}
+              </Card>
+            </div>
+          </div>
+          
+          {/* Fixed bottom action bar */}
+          <div className="flex-shrink-0 border-t bg-background p-4 space-y-2">
+            <div className="flex gap-2">
+              <Button 
+                className="flex-1 h-11"
+                onClick={handleConfirm}
+                disabled={reviewMutation.isPending}
+              >
+                <Check className="h-4 w-4 mr-1.5" />
+                Confirm
+              </Button>
+              <Button 
+                variant="outline"
+                className="flex-1 h-11"
+                onClick={() => setShowChangePicker(true)}
+              >
+                Change
+              </Button>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="w-full"
+              onClick={handleSkip}
+            >
+              <SkipForward className="h-4 w-4 mr-1.5" />
+              Skip for now
+            </Button>
+          </div>
+          
+          {/* Change picker bottom sheet */}
+          {showChangePicker && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-end" onClick={() => setShowChangePicker(false)}>
+              <div 
+                className="bg-background w-full rounded-t-2xl p-4 space-y-3 max-h-[60vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold">Change classification</h3>
+                  <Button variant="ghost" size="sm" onClick={() => setShowChangePicker(false)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                {Object.entries(bucketLabels).map(([bucket, label]) => (
+                  <Button
+                    key={bucket}
+                    variant="outline"
+                    className="w-full justify-start h-12"
+                    onClick={() => { handleChange(bucket); setMobileShowDetail(false); }}
+                    disabled={reviewMutation.isPending}
+                  >
+                    <Badge className={cn("mr-2", bucketColors[bucket])}>{label}</Badge>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // Mobile List View
     return (
       <div className="flex flex-col h-screen bg-background overflow-hidden">
         <MobileHeader 
@@ -683,21 +840,21 @@ export default function Review() {
         <div className="flex-1 overflow-y-auto">
           <div className="p-3 space-y-2">
             {reviewQueue.map((conv, idx) => {
-              const isSelected = currentIndex === idx;
               const isReviewed = reviewedIds.has(conv.id);
               
               return (
                 <Card 
                   key={conv.id}
                   className={cn(
-                    "p-3 cursor-pointer transition-all border",
-                    isSelected && "ring-2 ring-primary border-primary/50 bg-primary/5",
+                    "p-3 cursor-pointer transition-all border active:scale-[0.98]",
                     isReviewed && "opacity-50 bg-muted/30"
                   )}
-                  onClick={() => setCurrentIndex(idx)}
+                  onClick={() => {
+                    setCurrentIndex(idx);
+                    setMobileShowDetail(true);
+                  }}
                 >
-                  {/* Header row */}
-                  <div className="flex items-start gap-2 mb-1">
+                  <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm break-words">
                         {conv.customer?.name || conv.customer?.email || 'Unknown'}
@@ -706,70 +863,25 @@ export default function Review() {
                         {conv.title || conv.summary_for_human}
                       </p>
                     </div>
-                  </div>
-                  
-                  {/* Expanded content when selected */}
-                  {isSelected && (
-                    <div className="mt-3 pt-3 border-t border-border/50 space-y-3">
-                      {conv.why_this_needs_you && (
-                        <p className="text-xs text-muted-foreground break-words leading-relaxed">
-                          {conv.why_this_needs_you}
-                        </p>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <Badge 
+                        variant="outline" 
+                        className={cn("text-xs", bucketColors[conv.decision_bucket || 'wait'])}
+                      >
+                        {bucketLabels[conv.decision_bucket || 'wait']}
+                      </Badge>
+                      {conv.ai_draft_response && (
+                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                          Draft ready
+                        </Badge>
                       )}
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          className="flex-1 h-9"
-                          onClick={(e) => { e.stopPropagation(); handleConfirm(); }}
-                          disabled={reviewMutation.isPending}
-                        >
-                          <Check className="h-4 w-4 mr-1.5" />
-                          Confirm
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          className="flex-1 h-9"
-                          onClick={(e) => { e.stopPropagation(); setShowChangePicker(true); }}
-                        >
-                          Change
-                        </Button>
-                      </div>
                     </div>
-                  )}
+                  </div>
                 </Card>
               );
             })}
           </div>
         </div>
-        
-        {/* Change picker bottom sheet */}
-        {showChangePicker && currentConversation && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-end" onClick={() => setShowChangePicker(false)}>
-            <div 
-              className="bg-background w-full rounded-t-2xl p-4 space-y-3 max-h-[60vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold">Change classification</h3>
-                <Button variant="ghost" size="sm" onClick={() => setShowChangePicker(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              {Object.entries(bucketLabels).map(([bucket, label]) => (
-                <Button
-                  key={bucket}
-                  variant="outline"
-                  className="w-full justify-start h-12"
-                  onClick={() => handleChange(bucket)}
-                  disabled={reviewMutation.isPending}
-                >
-                  <Badge className={cn("mr-2", bucketColors[bucket])}>{label}</Badge>
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     );
   }
