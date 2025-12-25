@@ -2,7 +2,7 @@ import { Home, Mail, CheckCircle2, Clock, ChevronDown, ChevronRight, ChevronLeft
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
-import beeLogo from '@/assets/bee-logo.png';
+import bizzybeelogo from '@/assets/bizzybee-logo.png';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
@@ -101,8 +101,14 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           {isCollapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex-shrink-0 cursor-pointer">
-                  <img src={beeLogo} alt="BizzyBee Logo" className="h-10 w-10 rounded-lg hover:scale-110 transition-transform" />
+                <div className="flex-shrink-0 cursor-pointer h-10 w-10 overflow-hidden rounded-lg hover:scale-110 transition-transform">
+                  {/* CSS crop to show only the bee icon (top portion) */}
+                  <img 
+                    src={bizzybeelogo} 
+                    alt="BizzyBee" 
+                    className="w-10 h-auto object-cover object-top"
+                    style={{ marginTop: '-2px' }}
+                  />
                 </div>
               </TooltipTrigger>
               <TooltipContent side="right">
@@ -110,13 +116,12 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               </TooltipContent>
             </Tooltip>
           ) : (
-            <div className="flex items-center gap-3">
-              <div className="flex-shrink-0">
-                <img src={beeLogo} alt="BizzyBee Logo" className="h-10 w-10 rounded-lg" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h1 className="text-xl font-bold text-primary">BizzyBee</h1>
-              </div>
+            <div className="flex items-center">
+              <img 
+                src={bizzybeelogo} 
+                alt="BizzyBee" 
+                className="h-10 w-auto"
+              />
             </div>
           )}
         </div>
