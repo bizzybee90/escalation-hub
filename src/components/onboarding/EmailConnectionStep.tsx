@@ -15,7 +15,7 @@ interface EmailConnectionStepProps {
 }
 
 type Provider = 'gmail' | 'outlook' | 'icloud' | 'yahoo';
-type ImportMode = 'new_only' | 'unread_only' | 'all_historical_90_days';
+type ImportMode = 'new_only' | 'unread_only' | 'all_historical_30_days' | 'all_historical_90_days' | 'last_1000';
 
 const emailProviders = [
   { 
@@ -50,19 +50,30 @@ const emailProviders = [
 
 const importModes = [
   { 
-    value: 'unread_only' as ImportMode, 
-    label: 'Unread emails only', 
-    description: 'Import your current unread emails (recommended for quick start)' 
+    value: 'last_1000' as ImportMode, 
+    label: 'Last 1,000 emails', 
+    description: 'Best for AI learning — gives BizzyBee enough context to understand your patterns',
+    recommended: true
   },
   { 
     value: 'all_historical_90_days' as ImportMode, 
     label: 'Last 90 days', 
-    description: 'Import all emails from the past 90 days for better AI learning' 
+    description: 'Import all emails from the past 3 months' 
+  },
+  { 
+    value: 'all_historical_30_days' as ImportMode, 
+    label: 'Last 30 days', 
+    description: 'A lighter import for smaller inboxes' 
+  },
+  { 
+    value: 'unread_only' as ImportMode, 
+    label: 'Unread emails only', 
+    description: 'Quick start — just your current unread messages' 
   },
   { 
     value: 'new_only' as ImportMode, 
     label: 'New emails only', 
-    description: 'Only receive new emails going forward' 
+    description: 'Only receive new emails going forward (no history)' 
   },
 ];
 
@@ -75,7 +86,7 @@ export function EmailConnectionStep({
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
-  const [importMode, setImportMode] = useState<ImportMode>('unread_only');
+  const [importMode, setImportMode] = useState<ImportMode>('last_1000');
   const [checkingConnection, setCheckingConnection] = useState(false);
 
   const handleConnect = async (provider: Provider) => {
@@ -206,14 +217,25 @@ export function EmailConnectionStep({
               {importModes.map((mode) => (
                 <div 
                   key={mode.value}
-                  className="flex items-start gap-3 p-3 rounded-lg border hover:bg-accent/50 cursor-pointer"
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    importMode === mode.value 
+                      ? 'border-primary/50 bg-primary/5' 
+                      : 'hover:bg-accent/50'
+                  } ${mode.recommended ? 'ring-1 ring-primary/30' : ''}`}
                   onClick={() => setImportMode(mode.value)}
                 >
                   <RadioGroupItem value={mode.value} id={mode.value} className="mt-1" />
                   <div className="flex-1">
-                    <Label htmlFor={mode.value} className="font-medium cursor-pointer">
-                      {mode.label}
-                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor={mode.value} className="font-medium cursor-pointer">
+                        {mode.label}
+                      </Label>
+                      {mode.recommended && (
+                        <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                          Recommended
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">{mode.description}</p>
                   </div>
                 </div>
