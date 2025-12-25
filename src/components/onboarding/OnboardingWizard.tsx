@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -6,17 +6,19 @@ import { BusinessContextStep } from './BusinessContextStep';
 import { SenderRecognitionStep } from './SenderRecognitionStep';
 import { InitialTriageStep } from './InitialTriageStep';
 import { AutomationLevelStep } from './AutomationLevelStep';
+import { EmailConnectionStep } from './EmailConnectionStep';
 import beeLogo from '@/assets/bee-logo.png';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Mail } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OnboardingWizardProps {
   workspaceId: string;
   onComplete: () => void;
 }
 
-type Step = 'welcome' | 'business' | 'senders' | 'triage' | 'automation' | 'complete';
+type Step = 'welcome' | 'email' | 'business' | 'senders' | 'triage' | 'automation' | 'complete';
 
-const STEPS: Step[] = ['welcome', 'business', 'senders', 'triage', 'automation', 'complete'];
+const STEPS: Step[] = ['welcome', 'email', 'business', 'senders', 'triage', 'automation', 'complete'];
 
 export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
@@ -29,21 +31,76 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
   });
   const [senderRulesCreated, setSenderRulesCreated] = useState(0);
   const [triageResults, setTriageResults] = useState({ processed: 0, changed: 0 });
+  const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
+
+  // Save progress to database
+  const saveProgress = async (step: Step) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('users')
+          .update({ onboarding_step: step })
+          .eq('id', user.id);
+      }
+    } catch (error) {
+      console.error('Error saving progress:', error);
+    }
+  };
+
+  // Load saved progress on mount
+  useEffect(() => {
+    const loadProgress = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data } = await supabase
+            .from('users')
+            .select('onboarding_step')
+            .eq('id', user.id)
+            .single();
+          
+          if (data?.onboarding_step && STEPS.includes(data.onboarding_step as Step)) {
+            setCurrentStep(data.onboarding_step as Step);
+          }
+
+          // Check if email is already connected
+          const { data: emailConfig } = await supabase
+            .from('email_provider_configs')
+            .select('email_address')
+            .eq('workspace_id', workspaceId)
+            .limit(1)
+            .single();
+          
+          if (emailConfig?.email_address) {
+            setConnectedEmail(emailConfig.email_address);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading progress:', error);
+      }
+    };
+    loadProgress();
+  }, [workspaceId]);
 
   const stepIndex = STEPS.indexOf(currentStep);
   const progress = (stepIndex / (STEPS.length - 1)) * 100;
 
-  const handleNext = () => {
+  const handleNext = async () => {
     const nextIndex = stepIndex + 1;
     if (nextIndex < STEPS.length) {
-      setCurrentStep(STEPS[nextIndex]);
+      const nextStep = STEPS[nextIndex];
+      setCurrentStep(nextStep);
+      await saveProgress(nextStep);
     }
   };
 
-  const handleBack = () => {
+  const handleBack = async () => {
     const prevIndex = stepIndex - 1;
     if (prevIndex >= 0) {
-      setCurrentStep(STEPS[prevIndex]);
+      const prevStep = STEPS[prevIndex];
+      setCurrentStep(prevStep);
+      await saveProgress(prevStep);
     }
   };
 
@@ -73,6 +130,15 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
                 Let's Go
               </Button>
             </div>
+          )}
+
+          {currentStep === 'email' && (
+            <EmailConnectionStep
+              workspaceId={workspaceId}
+              onEmailConnected={(email) => setConnectedEmail(email)}
+              onNext={handleNext}
+              onBack={handleBack}
+            />
           )}
 
           {currentStep === 'business' && (
@@ -135,6 +201,13 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
                   <div className="text-sm text-muted-foreground">Emails sorted</div>
                 </div>
               </div>
+
+              {connectedEmail && (
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Mail className="h-4 w-4" />
+                  <span>Connected: {connectedEmail}</span>
+                </div>
+              )}
 
               <Button onClick={onComplete} size="lg" className="px-8">
                 Start Using BizzyBee

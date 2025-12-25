@@ -53,8 +53,13 @@ export type Database = {
         Row: {
           active_insurance_claim: boolean | null
           active_stripe_case: boolean | null
+          automation_level: string | null
+          business_type: string | null
+          company_logo_url: string | null
+          company_name: string | null
           created_at: string | null
           custom_flags: Json | null
+          email_domain: string | null
           id: string
           is_hiring: boolean | null
           updated_at: string | null
@@ -63,8 +68,13 @@ export type Database = {
         Insert: {
           active_insurance_claim?: boolean | null
           active_stripe_case?: boolean | null
+          automation_level?: string | null
+          business_type?: string | null
+          company_logo_url?: string | null
+          company_name?: string | null
           created_at?: string | null
           custom_flags?: Json | null
+          email_domain?: string | null
           id?: string
           is_hiring?: boolean | null
           updated_at?: string | null
@@ -73,8 +83,13 @@ export type Database = {
         Update: {
           active_insurance_claim?: boolean | null
           active_stripe_case?: boolean | null
+          automation_level?: string | null
+          business_type?: string | null
+          company_logo_url?: string | null
+          company_name?: string | null
           created_at?: string | null
           custom_flags?: Json | null
+          email_domain?: string | null
           id?: string
           is_hiring?: boolean | null
           updated_at?: string | null
@@ -1742,6 +1757,8 @@ export type Database = {
           is_online: boolean | null
           last_active_at: string | null
           name: string
+          onboarding_completed: boolean | null
+          onboarding_step: string | null
           status: string | null
           updated_at: string | null
           workspace_id: string | null
@@ -1754,6 +1771,8 @@ export type Database = {
           is_online?: boolean | null
           last_active_at?: string | null
           name: string
+          onboarding_completed?: boolean | null
+          onboarding_step?: string | null
           status?: string | null
           updated_at?: string | null
           workspace_id?: string | null
@@ -1766,6 +1785,8 @@ export type Database = {
           is_online?: boolean | null
           last_active_at?: string | null
           name?: string
+          onboarding_completed?: boolean | null
+          onboarding_step?: string | null
           status?: string | null
           updated_at?: string | null
           workspace_id?: string | null
