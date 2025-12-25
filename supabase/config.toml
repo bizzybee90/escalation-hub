@@ -104,3 +104,12 @@ verify_jwt = false
 
 [functions.retriage-conversation]
 verify_jwt = false
+
+[functions.gdpr-portal-request]
+verify_jwt = false
+
+[functions.gdpr-portal-verify]
+verify_jwt = false
+
+[functions.withdraw-consent]
+verify_jwt = false
