@@ -14,6 +14,7 @@ import { EscalationHub } from "./pages/EscalationHub";
 import ConversationView from "./pages/ConversationView";
 import { AuthGuard } from "./components/AuthGuard";
 import Home from "./pages/Home";
+import Onboarding from "./pages/Onboarding";
 import ChannelsDashboard from "./pages/ChannelsDashboard";
 import ChannelConversations from "./pages/ChannelConversations";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
@@ -30,6 +31,7 @@ const RouterContent = () => {
   return (
     <Routes>
       <Route path="/auth" element={<Auth />} />
+      <Route path="/onboarding" element={<Onboarding />} />
       
       {/* Home - Calm reassurance screen */}
       <Route 

@@ -26,11 +26,13 @@ import { BehaviorStatsPanel } from '@/components/settings/BehaviorStatsPanel';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 import { LowConfidenceWizard } from '@/components/settings/LowConfidenceWizard';
 import { LearningAnalyticsDashboard } from '@/components/settings/LearningAnalyticsDashboard';
+import { DataResetPanel } from '@/components/settings/DataResetPanel';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { BackButton } from '@/components/shared/BackButton';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { MobilePageLayout } from '@/components/layout/MobilePageLayout';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useWorkspace } from '@/hooks/useWorkspace';
 import { Bot, Plug, Shield, Layout, Code, ChevronRight, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +48,7 @@ export default function Settings() {
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const { workspace } = useWorkspace();
 
   const settingsCategories: SettingsCategory[] = [
     {
@@ -177,7 +180,12 @@ export default function Settings() {
       description: 'Testing, cleanup, and diagnostics',
       content: (
         <div className="space-y-3">
-          <SettingsSection title="Test Message Generator" description="Generate test messages" defaultOpen>
+          {workspace?.id && (
+            <SettingsSection title="Data Reset" description="Reset data and re-onboard" defaultOpen>
+              <DataResetPanel workspaceId={workspace.id} />
+            </SettingsSection>
+          )}
+          <SettingsSection title="Test Message Generator" description="Generate test messages">
             <TestMessageGenerator />
           </SettingsSection>
           <SettingsSection title="Test Data Cleanup" description="Remove test data">
