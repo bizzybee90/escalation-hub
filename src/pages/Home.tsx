@@ -170,7 +170,7 @@ export const Home = () => {
 
   const mainContent = (
     <ScrollArea className="h-[calc(100vh-4rem)]">
-      <div className="p-6 pb-24 space-y-6">
+      <div className="p-6 space-y-6">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
