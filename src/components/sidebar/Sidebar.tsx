@@ -105,7 +105,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                   <img 
                     src={bizzybeelogo} 
                     alt="BizzyBee" 
-                    className="h-10 w-10 object-contain"
+                    className="h-36 w-36 object-contain"
                   />
                 </div>
               </TooltipTrigger>
@@ -117,7 +117,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             <img 
               src={bizzybeelogo} 
               alt="BizzyBee" 
-              className="h-12 w-auto"
+              className="h-36 w-auto"
             />
           )}
         </div>
