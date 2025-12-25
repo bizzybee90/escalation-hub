@@ -19,7 +19,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import beeLogo from '@/assets/bee-logo.png';
+import bizzybeelogo from '@/assets/bizzybee-logo.png';
 import { formatDistanceToNow } from 'date-fns';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
 import { DraftMessages } from '@/components/dashboard/DraftMessages';
@@ -182,7 +182,7 @@ export const Home = () => {
           <>
             {/* Header with greeting */}
             <div className="flex items-center gap-4">
-              <img src={beeLogo} alt="BizzyBee" className="h-12 w-12 rounded-xl" />
+              <img src={bizzybeelogo} alt="BizzyBee" className="h-10 w-auto" />
               <div>
                 <h1 className="text-xl font-semibold text-foreground">
                   {getGreeting()}

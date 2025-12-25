@@ -7,7 +7,7 @@ import { SenderRecognitionStep } from './SenderRecognitionStep';
 import { InitialTriageStep } from './InitialTriageStep';
 import { AutomationLevelStep } from './AutomationLevelStep';
 import { EmailConnectionStep } from './EmailConnectionStep';
-import beeLogo from '@/assets/bee-logo.png';
+import bizzybeelogo from '@/assets/bizzybee-logo.png';
 import { CheckCircle2, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -109,7 +109,7 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
       <Card className="w-full max-w-2xl">
         <CardHeader className="text-center pb-2">
           <div className="flex justify-center mb-4">
-            <img src={beeLogo} alt="BizzyBee" className="h-16 w-16 rounded-2xl" />
+            <img src={bizzybeelogo} alt="BizzyBee" className="h-16 w-auto" />
           </div>
           {currentStep !== 'welcome' && currentStep !== 'complete' && (
             <Progress value={progress} className="h-2 mb-4" />
