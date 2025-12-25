@@ -108,8 +108,8 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <Card className="w-full max-w-2xl">
         <CardHeader className="text-center pb-2">
-          <div className="flex justify-center mb-4">
-            <img src={bizzybeelogo} alt="BizzyBee" className="h-16 w-auto" />
+          <div className="flex justify-center mb-6">
+            <img src={bizzybeelogo} alt="BizzyBee" className="h-24 w-auto" />
           </div>
           {currentStep !== 'welcome' && currentStep !== 'complete' && (
             <Progress value={progress} className="h-2 mb-4" />
